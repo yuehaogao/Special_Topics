@@ -1,7 +1,10 @@
-// MUS109IA & MAT276IA.
-// Spring 2022
-// Course Instrument 01. Sine Envelope with Visaul (Meshs and Spectrum)
-// Myungin Lee
+// MAT594P, Spring 2024
+// Yuehao Gao
+// Designed based on Myungin Lee's Sine Envelope with Visual
+
+// Allosphere Artificial Neural Network Illustration with Sonification
+
+
 
 // Press '[' or ']' to turn on & off GUI 
 // Able to play with MIDI device
@@ -14,7 +17,7 @@
 // = 9 note_02 1 
 
 #include <cmath>
-#include <cstdio> // for printing to stdout
+#include <cstdio>
 #include <stdio.h>
 #include <fstream>
 
@@ -48,14 +51,11 @@ using namespace std;
 #define ANN_NUM_HIDDEN_LAYERS 5
 const float pointSize = 1.0;
 const float pointDistance = 5.0;
-const float layerDistance = 10 * pointDistance;
+const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
-// const int Two_D_Size = ANN_SIZE * ANN_SIZE;
-// const int Three_D_Size = Two_D_Size * ANN_NUM_HIDDEN_LAYERS;
-// const int Full_Three_D_Size = Two_D_Size * (ANN_NUM_HIDDEN_LAYERS + 1);
 
 int frameCount = 0;
-const int changingThreashold = 1;
+const int framePerChange = 30;
 
 // This example shows how to use SynthVoice and SynthManagerto create an audio
 // visual synthesizer. In a class that inherits from SynthVoice you will
@@ -168,22 +168,34 @@ struct CommonState {
   float pointSize;
   float pointDistance;
   float layerDistance;
+  float lineWidth;
+
+  // *** 
+  // These 2D and 3D arrays are causing "al_OSC.cpp" to complain
+  // "OSC error: out of buffer memory"
+  // I tried and found that the maximum accumulative length allowed
+  // is only 82, which is not enough
 
   // Neuron Points
   Vec3f inputLayerNeuronFixedPosition[ANN_SIZE][ANN_SIZE];
-  Vec3f inputLayerNeuronRealTimeColor[ANN_SIZE][ANN_SIZE];
+  HSV inputLayerNeuronRealTimeColor[ANN_SIZE][ANN_SIZE];
   Vec3f hiddenLayerNeuronFixedPosition[ANN_NUM_HIDDEN_LAYERS][ANN_SIZE][ANN_SIZE];
-  Vec3f hiddenLayerNeuronRealTimeColor[ANN_NUM_HIDDEN_LAYERS][ANN_SIZE][ANN_SIZE];
+  HSV hiddenLayerNeuronRealTimeColor[ANN_NUM_HIDDEN_LAYERS][ANN_SIZE][ANN_SIZE];
   Vec3f outputLayerNeuronFixedPosition[ANN_SIZE][ANN_SIZE];
-  Vec3f outputLayerNeuronRealTimeColor[ANN_SIZE][ANN_SIZE];
+  HSV outputLayerNeuronRealTimeColor[ANN_SIZE][ANN_SIZE];
 
   // Lines
   Vec3f linesStartingFixedPosition[ANN_NUM_HIDDEN_LAYERS + 1][ANN_SIZE][ANN_SIZE];
   Vec3f linesEndingFixedPosition[ANN_NUM_HIDDEN_LAYERS + 1][ANN_SIZE][ANN_SIZE];
-  Vec3f linesRealTimeColor[ANN_NUM_HIDDEN_LAYERS + 1][ANN_SIZE][ANN_SIZE];
+  HSV linesRealTimeColor[ANN_NUM_HIDDEN_LAYERS + 1][ANN_SIZE][ANN_SIZE];
   
+  //***
+
 };
 
+
+// To slurp a file
+string slurp(string fileName);
 
 // ----------------------------------------------------------------------
 // ----------------------------------------------------------------------
@@ -192,9 +204,10 @@ struct MyApp : public DistributedAppWithState<CommonState>, public MIDIMessageHa
 {
 public:
   // GUI manager for SineEnv voices
-  // The name provided determines the name of the directory
-  // where the presets and sequences are stored
   SynthGUIManager<SineEnv> synthManager{"SineEnv"};
+
+  Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
+
   RtMidiIn midiIn; // MIDI input carrier
   Mesh mSpectrogram;
   vector<float> spectrum;
@@ -203,30 +216,89 @@ public:
   bool navi = false;
 
   // STFT variables
-  // Window size
-  // Hop size; number of samples between transforms
-  // Pad size; number of zero-valued samples appended to window
-  // Window type: HAMMING, HANN, WELCH, NYQUIST, or etc
-  // Format of frequency samples: COMPLEX, MAG_PHASE, or MAG_FREQ
   gam::STFT stft = gam::STFT(FFT_SIZE, FFT_SIZE / 4, 0, gam::HANN, gam::MAG_FREQ);
 
   // Shader and meshes
   ShaderProgram pointShader;
-
   Mesh InputLayer;
   Mesh HiddenLayers;
   Mesh OutputLayer;
   Mesh ConnectionLines;
 
-  // This function is called right after the window is created
-  // It provides a grphics context to initialqetize ParameterGUI
-  // It's also a good place to put things that should
-  // happen once at startup.
+
+  // --------------------------------------------------------
+  // onCreate
   void onCreate() override
   {
+    bool createPointShaderSuccess = pointShader.compile(slurp("../point-vertex.glsl"),
+                                                        slurp("../point-fragment.glsl"),
+                                                        slurp("../point-geometry.glsl"));
+
+    if (!createPointShaderSuccess) {
+      exit(1);
+    }
+
+    // ------------------------------------------------------------
+    // Initialize parameters for all meshes
+    
+    InputLayer.primitive(Mesh::POINTS);
+    HiddenLayers.primitive(Mesh::POINTS);
+    OutputLayer.primitive(Mesh::POINTS);
+    ConnectionLines.primitive(Mesh::LINES);
+    
+    // The input layer
+    for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
+      for (int ipColumn = 0; ipColumn < ANN_SIZE; ipColumn++) {
+        float x = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
+        float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
+        float z = 0.0;
+
+        InputLayer.vertex(Vec3f(x, y, z));
+        state().inputLayerNeuronFixedPosition[ipRow][ipColumn] = Vec3f(x, y, z);
+        InputLayer.color(HSV(0, 0, 100));  // Input layer initialized as white
+        state().inputLayerNeuronRealTimeColor[ipRow][ipColumn] = HSV(0.0f, 0.0f, 100.0f);
+        InputLayer.texCoord(1.0, 0);
+      }
+    }
+
+    // The hidden layers
+    for (int hdLayer = 0; hdLayer < ANN_NUM_HIDDEN_LAYERS; hdLayer++) {
+      for (int hdRow = 0; hdRow < ANN_SIZE; hdRow++) {
+        for (int hdColumn = 0; hdColumn < ANN_SIZE; hdColumn++) {
+          float x = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
+          float y = (hdColumn - (ANN_SIZE * 0.5)) * pointDistance;
+          float z = hdLayer * layerDistance;
+
+          HiddenLayers.vertex(Vec3f(x, y, z));
+          state().hiddenLayerNeuronFixedPosition[hdLayer][hdRow][hdColumn] = Vec3f(x, y, z);
+        
+          HiddenLayers.color(HSV(0, 0, 100));  // Input layer initialized as white
+          state().hiddenLayerNeuronRealTimeColor[hdLayer][hdRow][hdColumn] = HSV(0.0f, 0.0f, 100.0f);
+        }
+      }
+    }
+
+    // The output layer
+    for (int opRow = 0; opRow < ANN_SIZE; opRow++) {
+      for (int opColumn = 0; opColumn < ANN_SIZE; opColumn++) {
+        float x = (opRow - (ANN_SIZE * 0.5)) * pointDistance;
+        float y = (opColumn - (ANN_SIZE * 0.5)) * pointDistance;
+        float z = (ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance;
+
+        OutputLayer.vertex(Vec3f(x, y, z));
+        state().outputLayerNeuronFixedPosition[opRow][opColumn] = Vec3f(x, y, z);
+        
+        OutputLayer.color(HSV(0, 0, 100));  // Input layer initialized as white
+        state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0, 0, 100);
+      }
+    }
+    
+    
+    // ------------------------------------------------------------
+
     navControl().active(false); // Disable navigation via keyboard, since we
                                 // will be using keyboard for note triggering
-    nav().pos(0, 0, 15);
+    
 
     // Set sampling rate for Gamma objects from app's audio
     gam::sampleRate(audioIO().framesPerSecond());
@@ -235,30 +307,56 @@ public:
 
     // Play example sequence. Comment this line to start from scratch
     synthManager.synthRecorder().verbose(true);
+
+    if (isPrimary()) {
+      nav().pos(0, 0, 10);
+    }
   }
 
-  void onInit()
+
+  // --------------------------------------------------------
+  // onInit
+  void onInit() override
   {
-    // Check for connected MIDI devices
-    if (midiIn.getPortCount() > 0)
-    {
-      // Bind ourself to the RtMidiIn object, to have the onMidiMessage()
-      // callback called whenever a MIDI message is received
-      MIDIMessageHandler::bindTo(midiIn);
+    // Try starting the program. If not successful, exit.
+    auto cuttleboneDomain =
+        CuttleboneStateSimulationDomain<CommonState>::enableCuttlebone(this);
+    if (!cuttleboneDomain) {
+      std::cerr << "ERROR: Could not start Cuttlebone. Quitting." << std::endl;
+      quit();
+    }
 
-      // Open the last device found
-      unsigned int port = midiIn.getPortCount() - 1;
-      midiIn.openPort(port);
-      printf("Opened port to %s\n", midiIn.getPortName(port).c_str());
+    if (isPrimary()) {
+      // Check for connected MIDI devices
+      if (midiIn.getPortCount() > 0)
+      {
+        // Bind ourself to the RtMidiIn object, to have the onMidiMessage()
+        // callback called whenever a MIDI message is received
+        MIDIMessageHandler::bindTo(midiIn);
+
+        //?
+        // Set up GUI
+        auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
+        auto& gui = GUIdomain->newGUI();
+        gui.add(pointSize);
+        state().pointSize = pointSize;
+
+        // Open the last device found
+       unsigned int port = midiIn.getPortCount() - 1;
+        midiIn.openPort(port);
+        printf("Opened port to %s\n", midiIn.getPortName(port).c_str());
+      }
+      else
+      {
+        printf("Error: No MIDI devices found.\n");
+      }
+      // Declare the size of the spectrum 
+      spectrum.resize(FFT_SIZE / 2 + 1);
     }
-    else
-    {
-      printf("Error: No MIDI devices found.\n");
-    }
-    // Declare the size of the spectrum 
-    spectrum.resize(FFT_SIZE / 2 + 1);
   }
 
+  // --------------------------------------------------------
+  // onSound
   // The audio callback function. Called when audio hardware requires data
   void onSound(AudioIOData &io) override
   {
@@ -278,6 +376,9 @@ public:
     }
   }
 
+
+  // --------------------------------------------------------
+  // onAnimate
   void onAnimate(double dt) override
   {
     // The GUI is prepared here
@@ -288,13 +389,24 @@ public:
     navControl().active(navi);
   }
 
+
+  // --------------------------------------------------------
+  // onDraw
   // The graphics callback function.
   void onDraw(Graphics &g) override
   {
-    g.clear();
-    // Render the synth's graphics
-    synthManager.render(g);
-    // // Draw Spectrum
+    g.clear(0.0);
+    // synthManager.render(g); <- This is commented out because we show ANN but not the notes
+    g.shader(pointShader);
+    g.shader().uniform("pointSize", 1.0);
+    g.blending(true);
+    g.blendTrans();
+    g.depthTesting(true);
+    g.draw(InputLayer);
+
+    // Draw Spectrum
+    // Commented out for testing drawing the meshes of ANN only
+    ///*
     mSpectrogram.reset();
     mSpectrogram.primitive(Mesh::LINE_STRIP);
     if (showSpectro)
@@ -315,7 +427,11 @@ public:
     if (showGUI)
     {
       imguiDraw();
+      // ? how to show the "gui"
+      // defined on line (): auto& gui = GUIdomain->newGUI();
+      // with more adjustable parameters?
     }
+    //*/
   }
 
   // This gets called whenever a MIDI message is received on the port
@@ -409,6 +525,21 @@ public:
 
   void onExit() override { imguiShutdown(); }
 };
+
+
+// slurp
+// To slurp from a file
+//
+string slurp(string fileName) {
+  fstream file(fileName);
+  string returnValue = "";
+  while (file.good()) {
+    string line;
+    getline(file, line);
+    returnValue += line + "\n";
+  }
+  return returnValue;
+}
 
 int main()
 {
