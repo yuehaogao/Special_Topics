@@ -56,8 +56,8 @@ using namespace std;
 #define ANN_SIZE 20
 #define ANN_NUM_HIDDEN_LAYERS 5
 
-const float pointSize = 1.0;
-const float pointDistance = 5.0;
+const float pointSize = 0.05;
+const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
 
@@ -320,7 +320,7 @@ public:
     synthManager.synthRecorder().verbose(true);
 
     if (isPrimary()) {
-      nav().pos(0.0, 0.0, 12.0);
+      nav().pos(0.0, 0.0, 15.0);
     }
   }
 
@@ -407,7 +407,7 @@ public:
     g.clear(0.0);
     // synthManager.render(g); <- This is commented out because we show ANN but not the notes
     g.shader(pointShader);
-    g.shader().uniform("pointSize", 1.0);
+    g.shader().uniform("pointSize", 0.05);
     g.blending(true);
     g.blendTrans();
     g.depthTesting(true);
@@ -561,9 +561,6 @@ int main()
   // return 0;
 
   MyApp app;
-
-  //NonInputLayers hiddenLayersNeurons(5, 20);
-
 
   if (al::Socket::hostName() == "ar01.1g") {
     AudioDevice device = AudioDevice("ECHO X5");
