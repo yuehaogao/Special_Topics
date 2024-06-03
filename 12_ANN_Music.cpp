@@ -1,8 +1,10 @@
 // MAT594P, Spring 2024
 // Yuehao Gao
-// Designed based on Myungin Lee's Sine Envelope with Visual
+// Designed based on Myungin Lee(2022) Sine Envelope with Visuals
 
 // Allosphere Artificial Neural Network Illustration with Sonification
+// Inspired by a YouTube Video: 
+// https://www.youtube.com/watch?v=Tsvxx-GGlTg&t=1s
 
 // ----------------------------------------------------------------
 // Press '=' to enable/disable navigation
@@ -239,9 +241,9 @@ public:
   // --------------------------------------------------------
   // onCreate
   void onCreate() override {
-    bool createPointShaderSuccess = pointShader.compile(slurp("../point-vertex.glsl"),
-                                                        slurp("../point-fragment.glsl"),
-                                                        slurp("../point-geometry.glsl"));
+    bool createPointShaderSuccess = pointShader.compile(slurp("../point_tools/point-vertex.glsl"),
+                                                        slurp("../point_tools/point-fragment.glsl"),
+                                                        slurp("../point_tools/point-geometry.glsl"));
 
     if (!createPointShaderSuccess) {
       exit(1);
