@@ -4,10 +4,11 @@
 
 // Allosphere Artificial Neural Network Illustration with Sonification
 
-
-
+// ----------------------------------------------------------------
+// Press '=' to enable/disable navigation
 // Press '[' or ']' to turn on & off GUI 
-// Able to play with MIDI device
+// ----------------------------------------------------------------
+
 
 // How to make .synthSequence notes 
 // # The '>' command adds an offset time to all events following
@@ -15,6 +16,7 @@
 // # The '=' command adds another existing .synthSequence file to be played at the offset time.
 // For example, the underlying command plays "note_02.synthSequence" file at 9 sec.
 // = 9 note_02 1 
+
 
 #include <cmath>
 #include <cstdio>
@@ -51,6 +53,7 @@ using namespace std;
 #define FFT_SIZE 4048
 #define ANN_SIZE 20
 #define ANN_NUM_HIDDEN_LAYERS 5
+
 const float pointSize = 1.0;
 const float pointDistance = 5.0;
 const float layerDistance = 7.0 * pointDistance;
@@ -168,6 +171,8 @@ public:
 // ----------------------------------------------------------------------
 // The shared state between local and the Allosphere Terminal
 struct CommonState {
+
+  Pose pose;    
   float pointSize;
   float pointDistance;
   float layerDistance;
@@ -210,13 +215,7 @@ public:
   SynthGUIManager<SineEnv> synthManager{"SineEnv"};
 
   // The hidden neurons that producing the data output
-
-  // *** THIS IS VERY WEIRD: IT WORKS IN "MINOR_TESTS.CPP" BUT NOT HERE
-  // "NonInputLayers hiddenLayerNeurons()" DOES WORK
-  NonInputLayers hiddenLayersNeurons = NonInputLayers(5, 20);
-  // ***
-
-  Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
+  NonInputLayers hiddenLayersNeurons = NonInputLayers(ANN_NUM_HIDDEN_LAYERS, ANN_SIZE);
 
   RtMidiIn midiIn; // MIDI input carrier
   Mesh mSpectrogram;
@@ -230,6 +229,7 @@ public:
 
   // Shader and meshes
   ShaderProgram pointShader;
+
   Mesh InputLayer;
   Mesh HiddenLayers;
   Mesh OutputLayer;
@@ -238,8 +238,7 @@ public:
 
   // --------------------------------------------------------
   // onCreate
-  void onCreate() override
-  {
+  void onCreate() override {
     bool createPointShaderSuccess = pointShader.compile(slurp("../point-vertex.glsl"),
                                                         slurp("../point-fragment.glsl"),
                                                         slurp("../point-geometry.glsl"));
@@ -251,10 +250,7 @@ public:
     // ------------------------------------------------------------
     // Initialize parameters for all meshes
     
-    InputLayer.primitive(Mesh::POINTS);
-    HiddenLayers.primitive(Mesh::POINTS);
-    OutputLayer.primitive(Mesh::POINTS);
-    ConnectionLines.primitive(Mesh::LINES);
+    
     
     // The input layer
     for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
@@ -265,8 +261,8 @@ public:
 
         InputLayer.vertex(Vec3f(x, y, z));
         state().inputLayerNeuronFixedPosition[ipRow][ipColumn] = Vec3f(x, y, z);
-        InputLayer.color(HSV(0, 0, 100));  // Input layer initialized as white
-        state().inputLayerNeuronRealTimeColor[ipRow][ipColumn] = HSV(0.0f, 0.0f, 100.0f);
+        InputLayer.color(HSV(60.0, 100.0, 100.0));  // Input layer initialized as white
+        state().inputLayerNeuronRealTimeColor[ipRow][ipColumn] = HSV(60.0f, 100.0f, 100.0f);
         InputLayer.texCoord(1.0, 0);
       }
     }
@@ -302,32 +298,32 @@ public:
         state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0, 0, 100);
       }
     }
+
+    InputLayer.primitive(Mesh::POINTS);
+    HiddenLayers.primitive(Mesh::POINTS);
+    OutputLayer.primitive(Mesh::POINTS);
+    ConnectionLines.primitive(Mesh::LINES);
     
     
     // ------------------------------------------------------------
 
     navControl().active(false); // Disable navigation via keyboard, since we
                                 // will be using keyboard for note triggering
-    
-
     // Set sampling rate for Gamma objects from app's audio
     gam::sampleRate(audioIO().framesPerSecond());
-
     imguiInit();
-
     // Play example sequence. Comment this line to start from scratch
     synthManager.synthRecorder().verbose(true);
 
     if (isPrimary()) {
-      nav().pos(0, 0, 10);
+      nav().pos(0.0, 0.0, 12.0);
     }
   }
 
 
   // --------------------------------------------------------
   // onInit
-  void onInit() override
-  {
+  void onInit() override {
     // Try starting the program. If not successful, exit.
     auto cuttleboneDomain =
         CuttleboneStateSimulationDomain<CommonState>::enableCuttlebone(this);
@@ -346,19 +342,18 @@ public:
 
         //?
         // Set up GUI
-        auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
-        auto& gui = GUIdomain->newGUI();
-        gui.add(pointSize);
-        state().pointSize = pointSize;
+        // auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
+        // auto& gui = GUIdomain->newGUI();
+
 
         // Open the last device found
-       unsigned int port = midiIn.getPortCount() - 1;
+        unsigned int port = midiIn.getPortCount() - 1;
         midiIn.openPort(port);
         printf("Opened port to %s\n", midiIn.getPortName(port).c_str());
       }
       else
       {
-        printf("Error: No MIDI devices found.\n");
+        printf("Actually, no MIDI devices found, please use Keyboard.\n");
       }
       // Declare the size of the spectrum 
       spectrum.resize(FFT_SIZE / 2 + 1);
