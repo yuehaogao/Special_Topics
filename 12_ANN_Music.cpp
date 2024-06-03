@@ -56,9 +56,14 @@ using namespace std;
 #define ANN_SIZE 20
 #define ANN_NUM_HIDDEN_LAYERS 5
 
+#define WHITE_H 0.0
+#define WHITE_S 0.0
+#define WHITE_V 100.0
+
+
 const float pointSize = 0.05;
 const float pointDistance = 0.3;
-const float layerDistance = 7.0 * pointDistance;
+const float layerDistance = 4.0 * pointDistance;
 const float lineWidth = 0.5;
 
 int frameCount = 0;
@@ -252,19 +257,22 @@ public:
     // ------------------------------------------------------------
     // Initialize parameters for all meshes
     
+    // white: 0, 0, 100
+    // yellow: 60, 100, 100
+    // red: 60, 12, 100
     
     
     // The input layer
     for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
       for (int ipColumn = 0; ipColumn < ANN_SIZE; ipColumn++) {
-        float x = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
+        float z = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
         float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
-        float z = 0.0;
+        float x = -1 * layerDistance;
 
         InputLayer.vertex(Vec3f(x, y, z));
         state().inputLayerNeuronFixedPosition[ipRow][ipColumn] = Vec3f(x, y, z);
-        InputLayer.color(HSV(60.0, 100.0, 100.0));  // Input layer initialized as white
-        state().inputLayerNeuronRealTimeColor[ipRow][ipColumn] = HSV(60.0f, 100.0f, 100.0f);
+        InputLayer.color(HSV(0.0f, 0.0f, 0.7f));    // Input layer initialized as white
+        state().inputLayerNeuronRealTimeColor[ipRow][ipColumn] = HSV(0.0f, 0.0f, 0.7f);
         InputLayer.texCoord(1.0, 0);
       }
     }
@@ -273,15 +281,15 @@ public:
     for (int hdLayer = 0; hdLayer < ANN_NUM_HIDDEN_LAYERS; hdLayer++) {
       for (int hdRow = 0; hdRow < ANN_SIZE; hdRow++) {
         for (int hdColumn = 0; hdColumn < ANN_SIZE; hdColumn++) {
-          float x = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
+          float z = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
           float y = (hdColumn - (ANN_SIZE * 0.5)) * pointDistance;
-          float z = hdLayer * layerDistance;
+          float x = hdLayer * layerDistance;
 
           HiddenLayers.vertex(Vec3f(x, y, z));
           state().hiddenLayerNeuronFixedPosition[hdLayer][hdRow][hdColumn] = Vec3f(x, y, z);
-        
-          HiddenLayers.color(HSV(0, 0, 100));  // Input layer initialized as white
-          state().hiddenLayerNeuronRealTimeColor[hdLayer][hdRow][hdColumn] = HSV(0.0f, 0.0f, 100.0f);
+          HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f));  // Input layer initialized as dark red
+          state().hiddenLayerNeuronRealTimeColor[hdLayer][hdRow][hdColumn] = HSV(0.0f, 1.0f, 0.3f);
+          HiddenLayers.texCoord(1.0, 0);
         }
       }
     }
@@ -289,20 +297,19 @@ public:
     // The output layer
     for (int opRow = 0; opRow < ANN_SIZE; opRow++) {
       for (int opColumn = 0; opColumn < ANN_SIZE; opColumn++) {
-        float x = (opRow - (ANN_SIZE * 0.5)) * pointDistance;
+        float z = (opRow - (ANN_SIZE * 0.5)) * pointDistance;
         float y = (opColumn - (ANN_SIZE * 0.5)) * pointDistance;
-        float z = (ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance;
+        float x = ANN_NUM_HIDDEN_LAYERS * layerDistance;
 
         OutputLayer.vertex(Vec3f(x, y, z));
         state().outputLayerNeuronFixedPosition[opRow][opColumn] = Vec3f(x, y, z);
-        
-        OutputLayer.color(HSV(0, 0, 100));  // Input layer initialized as white
-        state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0, 0, 100);
+        OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));  // Input layer initialized as white
+        state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0.0f, 0.0f, 0.7f);
+        OutputLayer.texCoord(1.0, 0);
       }
     }
 
     
-
     InputLayer.primitive(Mesh::POINTS);
     HiddenLayers.primitive(Mesh::POINTS);
     OutputLayer.primitive(Mesh::POINTS);
@@ -320,7 +327,7 @@ public:
     synthManager.synthRecorder().verbose(true);
 
     if (isPrimary()) {
-      nav().pos(0.0, 0.0, 15.0);
+      nav().pos(0.0, 0.0, 22.0);
     }
   }
 
@@ -344,19 +351,16 @@ public:
         // callback called whenever a MIDI message is received
         MIDIMessageHandler::bindTo(midiIn);
 
-        //?
+        // ?
         // Set up GUI
         // auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
         // auto& gui = GUIdomain->newGUI();
-
 
         // Open the last device found
         unsigned int port = midiIn.getPortCount() - 1;
         midiIn.openPort(port);
         printf("Opened port to %s\n", midiIn.getPortName(port).c_str());
-      }
-      else
-      {
+      } else {
         printf("Actually, no MIDI devices found, please use Keyboard.\n");
       }
       // Declare the size of the spectrum 
@@ -412,6 +416,8 @@ public:
     g.blendTrans();
     g.depthTesting(true);
     g.draw(InputLayer);
+    g.draw(HiddenLayers);
+    g.draw(OutputLayer);
 
     // Draw Spectrum
     // Commented out for testing drawing the meshes of ANN only
