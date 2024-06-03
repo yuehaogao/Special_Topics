@@ -19,7 +19,9 @@
 #include <cmath>
 #include <cstdio>
 #include <stdio.h>
+#include <stdlib.h>
 #include <fstream>
+#include <time.h> 
 
 #include "Gamma/Analysis.h"
 #include "Gamma/Effects.h"
@@ -56,6 +58,7 @@ const float lineWidth = 0.5;
 
 int frameCount = 0;
 const int framePerChange = 30;
+
 
 // This example shows how to use SynthVoice and SynthManagerto create an audio
 // visual synthesizer. In a class that inherits from SynthVoice you will
@@ -206,6 +209,13 @@ public:
   // GUI manager for SineEnv voices
   SynthGUIManager<SineEnv> synthManager{"SineEnv"};
 
+  // The hidden neurons that producing the data output
+
+  // *** THIS IS VERY WEIRD: IT WORKS IN "MINOR_TESTS.CPP" BUT NOT HERE
+  // "NonInputLayers hiddenLayerNeurons()" DOES WORK
+  NonInputLayers hiddenLayersNeurons = NonInputLayers(5, 20);
+  // ***
+
   Parameter pointSize{"/pointSize", "", 0.5, 0.1, 1.5};
 
   RtMidiIn midiIn; // MIDI input carrier
@@ -224,7 +234,7 @@ public:
   Mesh HiddenLayers;
   Mesh OutputLayer;
   Mesh ConnectionLines;
-
+  
 
   // --------------------------------------------------------
   // onCreate
@@ -550,7 +560,12 @@ int main()
   // app.configureAudio(48000., 512, 2, 0);
   // app.start();
   // return 0;
+
   MyApp app;
+
+  //NonInputLayers hiddenLayersNeurons(5, 20);
+
+
   if (al::Socket::hostName() == "ar01.1g") {
     AudioDevice device = AudioDevice("ECHO X5");
     app.configureAudio(device, 44100, 128, device.channelsOutMax(), 2);
