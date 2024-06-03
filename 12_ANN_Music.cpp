@@ -269,7 +269,13 @@ public:
         float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
         float x = -1 * layerDistance;
 
+        // I am having some trouble here with "addCube":
+        //  - addCube(the_mesh, size)
+        //  - But may I ask how to define each cube's position and color
+        //    just within this iteration of the for_loop?
         InputLayer.vertex(Vec3f(x, y, z));
+        addCube(InputLayer, 0.05);
+
         state().inputLayerNeuronFixedPosition[ipRow][ipColumn] = Vec3f(x, y, z);
         InputLayer.color(HSV(0.0f, 0.0f, 0.7f));    // Input layer initialized as white
         state().inputLayerNeuronRealTimeColor[ipRow][ipColumn] = HSV(0.0f, 0.0f, 0.7f);
@@ -416,8 +422,8 @@ public:
     g.blendTrans();
     g.depthTesting(true);
     g.draw(InputLayer);
-    g.draw(HiddenLayers);
-    g.draw(OutputLayer);
+    //g.draw(HiddenLayers);
+    //g.draw(OutputLayer);
 
     // Draw Spectrum
     // Commented out for testing drawing the meshes of ANN only
