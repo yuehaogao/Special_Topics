@@ -256,11 +256,12 @@ public:
 
     // ------------------------------------------------------------
     // Initialize parameters for all meshes
-    
-    // white: 0, 0, 100
-    // yellow: 60, 100, 100
-    // red: 60, 12, 100
-    
+
+    InputLayer.primitive(Mesh::POINTS);
+    HiddenLayers.primitive(Mesh::POINTS);
+    OutputLayer.primitive(Mesh::POINTS);
+    ConnectionLines.primitive(Mesh::LINES);
+
     
     // The input layer
     for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
@@ -274,7 +275,7 @@ public:
         //  - But may I ask how to define each cube's position and color
         //    just within this iteration of the for_loop?
         InputLayer.vertex(Vec3f(x, y, z));
-        addCube(InputLayer, 0.05);
+        //addCube(InputLayer, 0.05);
 
         state().inputLayerNeuronFixedPosition[ipRow][ipColumn] = Vec3f(x, y, z);
         InputLayer.color(HSV(0.0f, 0.0f, 0.7f));    // Input layer initialized as white
@@ -315,11 +316,16 @@ public:
       }
     }
 
+    for (int i = 0; i < 10; i++) {
+      float x1 = -5.0;
+      float x2 = 5.0;
+      float y = (i + 1) * 0.1;
+      float z = 0.0;
+      ConnectionLines.vertex(Vec3f(x1, y, z));
+      ConnectionLines.vertex(Vec3f(x2, y, z));
+      ConnectionLines.color(HSV(0.15f, 1.0f, 1.0f));
+    }
     
-    InputLayer.primitive(Mesh::POINTS);
-    HiddenLayers.primitive(Mesh::POINTS);
-    OutputLayer.primitive(Mesh::POINTS);
-    ConnectionLines.primitive(Mesh::LINES);
     
     
     // ------------------------------------------------------------
@@ -422,8 +428,9 @@ public:
     g.blendTrans();
     g.depthTesting(true);
     g.draw(InputLayer);
-    //g.draw(HiddenLayers);
-    //g.draw(OutputLayer);
+    g.draw(HiddenLayers);
+    g.draw(OutputLayer);
+    g.draw(ConnectionLines);
 
     // Draw Spectrum
     // Commented out for testing drawing the meshes of ANN only
