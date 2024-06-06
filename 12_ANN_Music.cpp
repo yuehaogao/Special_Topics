@@ -53,23 +53,23 @@
 using namespace al;
 using namespace std;
 #define FFT_SIZE 4048
-#define ANN_SIZE 40
-#define ANN_NUM_HIDDEN_LAYERS 6
-#define REFRESH_THRESHOLD 50
-#define CHANGE_MOTION_LOWER_LIMIT 3000
-#define CHANGE_MOTION_UPPER_LIMIT 6000
+#define ANN_SIZE 35
+#define ANN_NUM_HIDDEN_LAYERS 5
+#define REFRESH_THRESHOLD 3          // The refresh rate of oval
+#define CHANGE_MOTION_LOWER_LIMIT 180
+#define CHANGE_MOTION_UPPER_LIMIT 360
 
 #define WHITE_H 0.0
 #define WHITE_S 0.0
 #define WHITE_V 100.0
 #define PI 3.1415926535
 #define OVAL_MARCHING_SPEED 0.09
-
-
+#define OVAL_LARGEST 0.3
+#define OVAL_SMALLEST 0.15
 
 const float pointSize = 0.05;
 const float pointDistance = 0.3;
-const float layerDistance = 6.0 * pointDistance;
+const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
 
 
@@ -229,6 +229,7 @@ public:
   bool navi = false;
 
   int frameCount;
+  int frameIndex;
   NonInputLayers hiddenLayersNeurons = NonInputLayers(ANN_NUM_HIDDEN_LAYERS, ANN_SIZE);  // The hidden neurons that producing the data output
   vector<vector<float>> liveInputMatrix;                                                 // The live input matrix
   vector<vector<vector<bool>>> isNeuronFired;                                            // The live referee tracking if each neurion is "lit up"
@@ -271,11 +272,12 @@ public:
 
     // Set up the parameters for the oval
     frameCount = 0;
+    frameIndex = 0;
     canvasSize = ANN_SIZE * pointDistance;
     ovalCenterX = 0.0;
     ovalCenterY = 0.0;
-    ovalRadiusX = 0.5 * canvasSize;
-    ovalRadiusY = 0.5 * canvasSize;
+    ovalRadiusX = 0.2 * canvasSize;
+    ovalRadiusY = 0.2 * canvasSize;
     float angle = rnd::uniform(2.0 * PI);
     float speed = OVAL_MARCHING_SPEED;
     ovalDX = speed * cos(angle);
@@ -304,9 +306,6 @@ public:
     // The input layer
     for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
       for (int ipColumn = 0; ipColumn < ANN_SIZE; ipColumn++) {
-        // float z = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
-        // float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
-        // float x = -1 * layerDistance;
         float x = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
         float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
         float z = (ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance;
@@ -330,9 +329,6 @@ public:
     for (int hdLayer = 0; hdLayer < ANN_NUM_HIDDEN_LAYERS; hdLayer++) {
       for (int hdRow = 0; hdRow < ANN_SIZE; hdRow++) {
         for (int hdColumn = 0; hdColumn < ANN_SIZE; hdColumn++) {
-          // float z = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
-          // float y = (hdColumn - (ANN_SIZE * 0.5)) * pointDistance;
-          // float x = hdLayer * layerDistance;
           float x = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
           float y = (hdColumn - (ANN_SIZE * 0.5)) * pointDistance;
           float z = ((ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance) - ((hdLayer + 1) * layerDistance);
@@ -453,21 +449,70 @@ public:
   {
     // The GUI is prepared here
     imguiBeginFrame();
+    frameIndex += 1;
    
     if (frameCount >= REFRESH_THRESHOLD) {
       frameCount = 0;
+
       // First refresh the input according to the movement of the circle
       vector<vector<float>> refreshedInputMatrix;
+      ovalCenterX += ovalDX;
+      ovalCenterY += ovalDY;
+      if ((((ovalCenterX - ovalRadiusX) <= (canvasSize * -0.5)) && (ovalDX < 0.0))
+        || (((ovalCenterX + ovalRadiusX) >= (canvasSize * 0.5)) && (ovalDX > 0.0))) {
+          ovalDX *= -1;
+      }
+      if ((((ovalCenterY - ovalRadiusY) <= (canvasSize * -0.5)) && (ovalDY < 0.0))
+        || (((ovalCenterY + ovalRadiusY) >= (canvasSize * 0.5)) && (ovalDY > 0.0))) {
+          ovalDY *= -1;
+      }
+      if (frameIndex > ovalNextChangeTimeX) {
+        ovalSizeChangeDirectionX *= -1;
+        ovalNextChangeTimeX = frameIndex + CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
+      }
+      if (frameIndex > ovalNextChangeTimeY) {
+        ovalSizeChangeDirectionY *= -1;
+        ovalNextChangeTimeY = frameIndex + CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
+      }
+      if (ovalRadiusX > canvasSize * OVAL_LARGEST) {
+        ovalRadiusX = canvasSize * OVAL_LARGEST;
+      }
+      if (ovalRadiusX < canvasSize * OVAL_SMALLEST) {
+        ovalRadiusX = canvasSize * OVAL_SMALLEST;
+      }
+      if (ovalRadiusY > canvasSize * OVAL_LARGEST) {
+        ovalRadiusY = canvasSize * OVAL_LARGEST;
+      }
+      if (ovalRadiusY < canvasSize * OVAL_SMALLEST) {
+        ovalRadiusY = canvasSize * OVAL_SMALLEST;
+      }
 
-     
-    //  InputLayer.colors().clear();
-    // for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
-    //   for (int ipColumn = 0; ipColumn < ANN_SIZE; ipColumn++) {
+      // If a point in the input layer is inside the oval
+      // Set that value as [1.0], otherwise set it as [0.0]
+      // And brush it as light yellow
+      InputLayer.colors().clear();
 
-    //     InputLayer.color(HSV(rnd::uniform(1., 0.1), rnd::uniform(1., 0.1), 0.7f));    // Input layer initialized as white
+      for (int row = 0; row < ANN_SIZE; row++) {
+        vector<float> refreshedOneLine;
+        for (int col = 0; col < ANN_SIZE; col++) {
+          float x = (row - (ANN_SIZE * 0.5)) * pointDistance;
+          float y = (col - (ANN_SIZE * 0.5)) * pointDistance;
+          float distanceX = abs(x - ovalCenterX) / ovalRadiusX;
+          float distanceY = abs(y - ovalCenterY) / ovalRadiusY;
+          float distance = sqrt(distanceX * distanceX + distanceY * distanceY);
+          if (distance <= 1) {
+            InputLayer.color(HSV(0.17f, 1.0f, 1.0f));
+            refreshedOneLine.push_back(1.0);
+          } else {
+            InputLayer.color(HSV(0.0f, 0.0f, 0.7f));
+            refreshedOneLine.push_back(0.0);
+          }
+        }
+        refreshedInputMatrix.push_back(refreshedOneLine);
+      }
+      liveInputMatrix = refreshedInputMatrix;
 
-    //   }
-    // }
+
       
 
     } else {
