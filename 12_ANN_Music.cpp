@@ -230,10 +230,13 @@ public:
 
   int frameCount;
   int frameIndex;
-  NonInputLayers hiddenLayersNeurons = NonInputLayers(ANN_NUM_HIDDEN_LAYERS, ANN_SIZE);  // The hidden neurons that producing the data output
+
+  // ------------------ OUR PRESCIOUS ANN STRUCTURE ------------------
+  NonInputLayers hiddenAndOutputNeurons = NonInputLayers(ANN_NUM_HIDDEN_LAYERS, ANN_SIZE);  // The hidden neurons that producing the data output
   vector<vector<float>> liveInputMatrix;                                                 // The live input matrix
   vector<vector<vector<bool>>> isNeuronFired;                                            // The live referee tracking if each neurion is "lit up"
-  
+  // -----------------------------------------------------------------
+
   // Parameters for the oval
   float canvasSize;
   float ovalCenterX;
@@ -454,7 +457,7 @@ public:
     if (frameCount >= REFRESH_THRESHOLD) {
       frameCount = 0;
 
-      // First refresh the input according to the movement of the circle
+      // Step (1): refresh the input value and color according to the movement of the circle -------------------------
       vector<vector<float>> refreshedInputMatrix;
       ovalCenterX += ovalDX;
       ovalCenterY += ovalDY;
@@ -503,14 +506,23 @@ public:
           if (distance <= 1) {
             InputLayer.color(HSV(0.17f, 1.0f, 1.0f));
             refreshedOneLine.push_back(1.0);
+            state().inputLayerNeuronRealTimeColor[row][col] = HSV(0.17f, 1.0f, 1.0f);
           } else {
             InputLayer.color(HSV(0.0f, 0.0f, 0.7f));
             refreshedOneLine.push_back(0.0);
+            state().inputLayerNeuronRealTimeColor[row][col] = HSV(0.0f, 0.0f, 0.7f);
           }
         }
         refreshedInputMatrix.push_back(refreshedOneLine);
       }
       liveInputMatrix = refreshedInputMatrix;
+
+      cout << "refreshed" << endl;
+
+
+      // Step (2): feed the new input into the neural network -------------------------
+      hiddenAndOutputNeurons.refreshInput(liveInputMatrix);
+      
 
 
       
