@@ -53,19 +53,23 @@
 using namespace al;
 using namespace std;
 #define FFT_SIZE 4048
-#define ANN_SIZE 20
-#define ANN_NUM_HIDDEN_LAYERS 5
+#define ANN_SIZE 40
+#define ANN_NUM_HIDDEN_LAYERS 6
 #define REFRESH_THRESHOLD 50
+#define CHANGE_MOTION_LOWER_LIMIT 3000
+#define CHANGE_MOTION_UPPER_LIMIT 6000
 
 #define WHITE_H 0.0
 #define WHITE_S 0.0
 #define WHITE_V 100.0
+#define PI 3.1415926535
+#define OVAL_MARCHING_SPEED 0.09
 
 
 
 const float pointSize = 0.05;
 const float pointDistance = 0.3;
-const float layerDistance = 4.0 * pointDistance;
+const float layerDistance = 6.0 * pointDistance;
 const float lineWidth = 0.5;
 
 
@@ -236,7 +240,7 @@ public:
   float ovalDX;
   float ovalDY;
   float ovalRadiusX;
-  float ovalRadiusy;
+  float ovalRadiusY;
   float ovalSizeChangeDirectionX;
   float ovalSizeChangeDirectionY;
   float ovalNextChangeTimeX;
@@ -265,7 +269,22 @@ public:
       exit(1);
     }
 
+    // Set up the parameters for the oval
     frameCount = 0;
+    canvasSize = ANN_SIZE * pointDistance;
+    ovalCenterX = 0.0;
+    ovalCenterY = 0.0;
+    ovalRadiusX = 0.5 * canvasSize;
+    ovalRadiusY = 0.5 * canvasSize;
+    float angle = rnd::uniform(2.0 * PI);
+    float speed = OVAL_MARCHING_SPEED;
+    ovalDX = speed * cos(angle);
+    ovalDY = speed * sin(angle);
+    ovalSizeChangeDirectionX = rnd::uniform(2.0) - 1.0;
+    ovalSizeChangeDirectionY = rnd::uniform(2.0) - 1.0;
+    ovalNextChangeTimeX = CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
+    ovalNextChangeTimeY = CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
+
 
     // Initialize the input values and the neuron activity referee
     vector<vector<float>> initialLiveInputMatrix(ANN_SIZE, vector<float>(ANN_SIZE, 0.0f));
@@ -365,7 +384,8 @@ public:
     synthManager.synthRecorder().verbose(true);
 
     if (isPrimary()) {
-      nav().pos(0.0, 0.0, 22.0);
+      nav().pos(-35.0, 0.0, 40.0);
+      nav().faceToward(0.0, 0.0, 2.2);
     }
   }
 
@@ -472,11 +492,12 @@ public:
     // synthManager.render(g); <- This is commented out because we show ANN but not the notes
     g.draw(ConnectionLines);
     g.shader(pointShader);
-    g.shader().uniform("pointSize", 0.05);
     g.blending(true);
     g.blendTrans();
     g.depthTesting(true);
+    g.shader().uniform("pointSize", 0.12);
     g.draw(InputLayer);
+    g.shader().uniform("pointSize", 0.05);
     g.draw(HiddenLayers);
     g.draw(OutputLayer);
     
