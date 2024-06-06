@@ -46,6 +46,8 @@ bool inStdRange(float n) {
 
 
 // * Major function that determines how the hidden & output layer neurons calculate
+//   - x: the relative x position in the matrix, from 0 to 1
+//   - y: the relative y position in the matrix, from 0 to 1
 float ANNAlgorithm(float x, float y, vector<vector<float>> input) {
     float sum = 0.0;
     float count = 0.0;
@@ -252,12 +254,12 @@ public:
 
         // Call each layer to react
         vector<vector<float>> currentInputMatrix = newInputValueMatrixGiven;
-        for (vector<float> oneLine : currentInputMatrix) {
-            for (float one : oneLine) {
-                cout << one << " | ";
-            }
-        }
-        cout << endl;
+        // for (vector<float> oneLine : currentInputMatrix) {
+        //     for (float one : oneLine) {
+        //         cout << one << " | ";
+        //     }
+        // }
+        // cout << endl;
         for (int currentLayer = 0; currentLayer <= this->numLayers; currentLayer++) {
             NeuronLayer currentNeuronLayer = this->nonInputNeurons[currentLayer];
             currentNeuronLayer.refreshInput(currentInputMatrix);
