@@ -55,10 +55,12 @@ using namespace std;
 #define FFT_SIZE 4048
 #define ANN_SIZE 20
 #define ANN_NUM_HIDDEN_LAYERS 5
+#define REFRESH_THRESHOLD 50
 
 #define WHITE_H 0.0
 #define WHITE_S 0.0
 #define WHITE_V 100.0
+
 
 
 const float pointSize = 0.05;
@@ -66,8 +68,6 @@ const float pointDistance = 0.3;
 const float layerDistance = 4.0 * pointDistance;
 const float lineWidth = 0.5;
 
-int frameCount = 0;
-const int framePerChange = 30;
 
 
 // This example shows how to use SynthVoice and SynthManagerto create an audio
@@ -187,9 +187,6 @@ struct CommonState {
 
   // *** 
   // These 2D and 3D arrays are causing "al_OSC.cpp" to complain
-  // "OSC error: out of buffer memory"
-  // I tried and found that the maximum accumulative length allowed
-  // is only 82, which is not enough
 
   // Neuron Points
   Vec3f inputLayerNeuronFixedPosition[ANN_SIZE][ANN_SIZE];
@@ -200,9 +197,9 @@ struct CommonState {
   HSV outputLayerNeuronRealTimeColor[ANN_SIZE][ANN_SIZE];
 
   // Lines
-  Vec3f linesStartingFixedPosition[ANN_NUM_HIDDEN_LAYERS + 1][ANN_SIZE][ANN_SIZE];
-  Vec3f linesEndingFixedPosition[ANN_NUM_HIDDEN_LAYERS + 1][ANN_SIZE][ANN_SIZE];
-  HSV linesRealTimeColor[ANN_NUM_HIDDEN_LAYERS + 1][ANN_SIZE][ANN_SIZE];
+  Vec3f linesStartingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1) * ANN_SIZE * ANN_SIZE];
+  Vec3f linesEndingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1) * ANN_SIZE * ANN_SIZE];
+  HSV linesRealTimeColor[(ANN_NUM_HIDDEN_LAYERS + 1) * ANN_SIZE * ANN_SIZE];
   
   //***
 
@@ -218,18 +215,32 @@ string slurp(string fileName);
 struct MyApp : public DistributedAppWithState<CommonState>, public MIDIMessageHandler
 {
 public:
-  // GUI manager for SineEnv voices
-  SynthGUIManager<SineEnv> synthManager{"SineEnv"};
-
-  // The hidden neurons that producing the data output
-  NonInputLayers hiddenLayersNeurons = NonInputLayers(ANN_NUM_HIDDEN_LAYERS, ANN_SIZE);
-
+  
+  SynthGUIManager<SineEnv> synthManager{"SineEnv"};                                      // GUI manager for SineEnv voices
   RtMidiIn midiIn; // MIDI input carrier
   Mesh mSpectrogram;
   vector<float> spectrum;
   bool showGUI = true;
   bool showSpectro = true;
   bool navi = false;
+
+  int frameCount;
+  NonInputLayers hiddenLayersNeurons = NonInputLayers(ANN_NUM_HIDDEN_LAYERS, ANN_SIZE);  // The hidden neurons that producing the data output
+  vector<vector<float>> liveInputMatrix;                                                 // The live input matrix
+  vector<vector<vector<bool>>> isNeuronFired;                                            // The live referee tracking if each neurion is "lit up"
+  
+  // Parameters for the oval
+  float canvasSize;
+  float ovalCenterX;
+  float ovalCenterY;
+  float ovalDX;
+  float ovalDY;
+  float ovalRadiusX;
+  float ovalRadiusy;
+  float ovalSizeChangeDirectionX;
+  float ovalSizeChangeDirectionY;
+  float ovalNextChangeTimeX;
+  float ovalNextChangeTimeY;
 
   // STFT variables
   gam::STFT stft = gam::STFT(FFT_SIZE, FFT_SIZE / 4, 0, gam::HANN, gam::MAG_FREQ);
@@ -254,6 +265,14 @@ public:
       exit(1);
     }
 
+    frameCount = 0;
+
+    // Initialize the input values and the neuron activity referee
+    vector<vector<float>> initialLiveInputMatrix(ANN_SIZE, vector<float>(ANN_SIZE, 0.0f));
+    liveInputMatrix = initialLiveInputMatrix;
+    vector<vector<vector<bool>>> initialIsNeuronFired((ANN_NUM_HIDDEN_LAYERS + 2), vector<vector<bool>>(ANN_SIZE, vector<bool>(ANN_SIZE, false)));
+    isNeuronFired = initialIsNeuronFired;
+
     // ------------------------------------------------------------
     // Initialize parameters for all meshes
 
@@ -266,17 +285,21 @@ public:
     // The input layer
     for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
       for (int ipColumn = 0; ipColumn < ANN_SIZE; ipColumn++) {
-        float z = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
+        // float z = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
+        // float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
+        // float x = -1 * layerDistance;
+        float x = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
         float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
-        float x = -1 * layerDistance;
+        float z = (ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance;
 
-        // I am having some trouble here with "addCube":
-        //  - addCube(the_mesh, size)
-        //  - But may I ask how to define each cube's position and color
-        //    just within this iteration of the for_loop?
+        // addCube(InputLayer);
+        // Mat4f xfm;
+        // xfm.setIdentity;
+        // xfm.scale(Vec3f(pointSize, pointSize, pointSize));
+        // xfm.translate(Vec3f(x, y, z));
+        // InputLayer.transform(xfm, InputLayer.vertices().size());
+
         InputLayer.vertex(Vec3f(x, y, z));
-        //addCube(InputLayer, 0.05);
-
         state().inputLayerNeuronFixedPosition[ipRow][ipColumn] = Vec3f(x, y, z);
         InputLayer.color(HSV(0.0f, 0.0f, 0.7f));    // Input layer initialized as white
         state().inputLayerNeuronRealTimeColor[ipRow][ipColumn] = HSV(0.0f, 0.0f, 0.7f);
@@ -288,9 +311,12 @@ public:
     for (int hdLayer = 0; hdLayer < ANN_NUM_HIDDEN_LAYERS; hdLayer++) {
       for (int hdRow = 0; hdRow < ANN_SIZE; hdRow++) {
         for (int hdColumn = 0; hdColumn < ANN_SIZE; hdColumn++) {
-          float z = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
+          // float z = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
+          // float y = (hdColumn - (ANN_SIZE * 0.5)) * pointDistance;
+          // float x = hdLayer * layerDistance;
+          float x = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
           float y = (hdColumn - (ANN_SIZE * 0.5)) * pointDistance;
-          float x = hdLayer * layerDistance;
+          float z = ((ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance) - ((hdLayer + 1) * layerDistance);
 
           HiddenLayers.vertex(Vec3f(x, y, z));
           state().hiddenLayerNeuronFixedPosition[hdLayer][hdRow][hdColumn] = Vec3f(x, y, z);
@@ -304,27 +330,27 @@ public:
     // The output layer
     for (int opRow = 0; opRow < ANN_SIZE; opRow++) {
       for (int opColumn = 0; opColumn < ANN_SIZE; opColumn++) {
-        float z = (opRow - (ANN_SIZE * 0.5)) * pointDistance;
+        float x = (opRow - (ANN_SIZE * 0.5)) * pointDistance;
         float y = (opColumn - (ANN_SIZE * 0.5)) * pointDistance;
-        float x = ANN_NUM_HIDDEN_LAYERS * layerDistance;
+        float z = 0.0;
 
         OutputLayer.vertex(Vec3f(x, y, z));
-        state().outputLayerNeuronFixedPosition[opRow][opColumn] = Vec3f(x, y, z);
+        //state().outputLayerNeuronFixedPosition[opRow][opColumn] = Vec3f(x, y, z);
         OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));  // Input layer initialized as white
-        state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0.0f, 0.0f, 0.7f);
+        //state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0.0f, 0.0f, 0.7f);
         OutputLayer.texCoord(1.0, 0);
       }
     }
 
-    for (int i = 0; i < 10; i++) {
-      float x1 = -5.0;
-      float x2 = 5.0;
-      float y = (i + 1) * 0.1;
-      float z = 0.0;
-      ConnectionLines.vertex(Vec3f(x1, y, z));
-      ConnectionLines.vertex(Vec3f(x2, y, z));
-      ConnectionLines.color(HSV(0.15f, 1.0f, 1.0f));
-    }
+    // for (int i = 0; i < 10; i++) {
+    //   float x1 = -5.0;
+    //   float x2 = 5.0;
+    //   float y = (i + 1) * 0.1;
+    //   float z = 0.0;
+    //   ConnectionLines.vertex(Vec3f(x1, y, z));
+    //   ConnectionLines.vertex(Vec3f(x2, y, z));
+    //   ConnectionLines.color(HSV(0.15f, 1.0f, 1.0f));
+    // }
     
     
     
@@ -363,7 +389,6 @@ public:
         // callback called whenever a MIDI message is received
         MIDIMessageHandler::bindTo(midiIn);
 
-        // ?
         // Set up GUI
         // auto GUIdomain = GUIDomain::enableGUI(defaultWindowDomain());
         // auto& gui = GUIdomain->newGUI();
@@ -408,6 +433,29 @@ public:
   {
     // The GUI is prepared here
     imguiBeginFrame();
+   
+    if (frameCount >= REFRESH_THRESHOLD) {
+      frameCount = 0;
+      // First refresh the input according to the movement of the circle
+      vector<vector<float>> refreshedInputMatrix;
+
+     
+    //  InputLayer.colors().clear();
+    // for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
+    //   for (int ipColumn = 0; ipColumn < ANN_SIZE; ipColumn++) {
+
+    //     InputLayer.color(HSV(rnd::uniform(1., 0.1), rnd::uniform(1., 0.1), 0.7f));    // Input layer initialized as white
+
+    //   }
+    // }
+      
+
+    } else {
+      frameCount += 1;
+    }
+    
+
+
     // Draw a window that contains the synth control panel
     synthManager.drawSynthControlPanel();
     imguiEndFrame();
@@ -422,6 +470,7 @@ public:
   {
     g.clear(0.0);
     // synthManager.render(g); <- This is commented out because we show ANN but not the notes
+    g.draw(ConnectionLines);
     g.shader(pointShader);
     g.shader().uniform("pointSize", 0.05);
     g.blending(true);
@@ -430,7 +479,7 @@ public:
     g.draw(InputLayer);
     g.draw(HiddenLayers);
     g.draw(OutputLayer);
-    g.draw(ConnectionLines);
+    
 
     // Draw Spectrum
     // Commented out for testing drawing the meshes of ANN only
@@ -461,6 +510,7 @@ public:
     }
     //*/
   }
+
 
   // This gets called whenever a MIDI message is received on the port
   void onMIDIMessage(const MIDIMessage &m)
