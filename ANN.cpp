@@ -3,7 +3,9 @@
 #include <cstdlib>
 #include <ctime>
 #include <optional>
+#include "al/math/al_Random.hpp"
 
+using namespace al;
 using namespace std;
 
 #define MAX_SIZE 200
@@ -49,15 +51,20 @@ bool inStdRange(float n) {
 //   - x: the relative x position in the matrix, from 0 to 1
 //   - y: the relative y position in the matrix, from 0 to 1
 float ANNAlgorithm(float x, float y, vector<vector<float>> input) {
-    float sum = 0.0;
+    float result = 0.0;
     float count = 0.0;
     for (vector<float> oneRow : input) {
         for (float oneValue : oneRow) {
-            sum += oneValue;
+            result += oneValue;
             count += 1.0;
         }
     }
-    return ((sum + (x / 2.0)) / (count + (y / 2.0)));
+
+    float bias = rnd::uniform(1.0);
+    result = result * result;
+    //result += bias;
+    //return ((result + (x / 2.0)) / (count + (y / 2.0)));
+    return bias;
 }
 
 
