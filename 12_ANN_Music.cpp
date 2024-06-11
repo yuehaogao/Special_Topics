@@ -41,7 +41,7 @@
 #include "al/graphics/al_Shapes.hpp"
 #include "al/io/al_MIDI.hpp"
 #include "al/math/al_Functions.hpp"
-#include "al/math/al_Random.hpp"
+//#include "al/math/al_Random.hpp"
 #include "al/scene/al_PolySynth.hpp"
 #include "al/scene/al_SynthSequencer.hpp"
 #include "al/ui/al_ControlGUI.hpp"
@@ -55,7 +55,7 @@ using namespace std;
 #define FFT_SIZE 4048
 #define ANN_SIZE 35
 #define ANN_NUM_HIDDEN_LAYERS 5
-#define REFRESH_THRESHOLD 3          // The refresh rate of oval
+#define REFRESH_THRESHOLD 30          // The refresh rate of oval
 #define CHANGE_MOTION_LOWER_LIMIT 180
 #define CHANGE_MOTION_UPPER_LIMIT 360
 
@@ -71,6 +71,7 @@ const float pointSize = 0.05;
 const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
+const float firingThreshold = 0.97;
 
 
 
@@ -201,9 +202,9 @@ struct CommonState {
   HSV outputLayerNeuronRealTimeColor[ANN_SIZE][ANN_SIZE];
 
   // Lines
-  Vec3f linesStartingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1) * ANN_SIZE * ANN_SIZE];
-  Vec3f linesEndingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1) * ANN_SIZE * ANN_SIZE];
-  HSV linesRealTimeColor[(ANN_NUM_HIDDEN_LAYERS + 1) * ANN_SIZE * ANN_SIZE];
+  Vec3f linesStartingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
+  Vec3f linesEndingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
+  HSV linesRealTimeColor[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
   
   //***
 
@@ -294,7 +295,7 @@ public:
     // Initialize the input values and the neuron activity referee
     vector<vector<float>> initialLiveInputMatrix(ANN_SIZE, vector<float>(ANN_SIZE, 0.0f));
     liveInputMatrix = initialLiveInputMatrix;
-    vector<vector<vector<bool>>> initialIsNeuronFired((ANN_NUM_HIDDEN_LAYERS + 2), vector<vector<bool>>(ANN_SIZE, vector<bool>(ANN_SIZE, false)));
+    vector<vector<vector<bool>>> initialIsNeuronFired((ANN_NUM_HIDDEN_LAYERS + 1), vector<vector<bool>>(ANN_SIZE, vector<bool>(ANN_SIZE, false)));
     isNeuronFired = initialIsNeuronFired;
 
     // ------------------------------------------------------------
@@ -334,7 +335,7 @@ public:
         for (int hdColumn = 0; hdColumn < ANN_SIZE; hdColumn++) {
           float x = (hdRow - (ANN_SIZE * 0.5)) * pointDistance;
           float y = (hdColumn - (ANN_SIZE * 0.5)) * pointDistance;
-          float z = ((ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance) - ((hdLayer + 1) * layerDistance);
+          float z = ((ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance) - ((hdLayer + 1) * layerDistance) + rnd::uniform(3 * pointDistance) - 1.5 * pointDistance;
 
           HiddenLayers.vertex(Vec3f(x, y, z));
           state().hiddenLayerNeuronFixedPosition[hdLayer][hdRow][hdColumn] = Vec3f(x, y, z);
@@ -359,16 +360,6 @@ public:
         OutputLayer.texCoord(1.0, 0);
       }
     }
-
-    // for (int i = 0; i < 10; i++) {
-    //   float x1 = -5.0;
-    //   float x2 = 5.0;
-    //   float y = (i + 1) * 0.1;
-    //   float z = 0.0;
-    //   ConnectionLines.vertex(Vec3f(x1, y, z));
-    //   ConnectionLines.vertex(Vec3f(x2, y, z));
-    //   ConnectionLines.color(HSV(0.15f, 1.0f, 1.0f));
-    // }
     
     
     
@@ -517,11 +508,74 @@ public:
       }
       liveInputMatrix = refreshedInputMatrix;
 
-      cout << "refreshed" << endl;
+      //cout << "refreshed" << endl;
 
 
       // Step (2): feed the new input into the neural network -------------------------
       hiddenAndOutputNeurons.refreshInput(liveInputMatrix);
+      
+      // Step (3): refresh the list of firing neurons and the "lines" -----------------
+      vector<vector<vector<float>>> currentNonInputLayerValues = hiddenAndOutputNeurons.getAllLayerOutput();
+      //vector<vector<vector<bool>>> currentIsNeuronFiring;
+      
+      // for (vector<vector<float>> oneLayerValue : currentNonInputLayerValues) {
+      //   vector<vector<float>> currentIsNeuronFiringOneLayer;
+      //   for (vector<float> oneLineValue : oneLayerValue) {
+      //     vector<float> currentIsNeuronFiringOneLine;
+      //     for (float oneValue : oneLineValue) {
+      //       if (oneValue >= firingThreshold) {
+      //         currentIsNeuronFiringOneLine.push_back(true);
+      //       } else {
+      //         currentIsNeuronFiringOneLine.push_back(false);
+      //       }
+      //     }
+      //     currentIsNeuronFiringOneLayer.push_back(currentIsNeuronFiringOneLine);
+      //   }
+      //   currentIsNeuronFiring.push_back(currentIsNeuronFiringOneLayer);
+      // }
+
+      // isNeuronFired = currentIsNeuronFiring;
+
+      ConnectionLines.vertices().clear();
+      ConnectionLines.colors().clear();
+      
+      ConnectionLines.primitive(Mesh::LINES);
+      vector<vector<Vec3f>> currentFiredNeuronPos;
+  
+      for (int layer = 0; layer < ANN_NUM_HIDDEN_LAYERS + 1; layer++) {
+        vector<Vec3f> currentFiredNeuronOneLayer;
+        for (int row = 0; row < ANN_SIZE; row++) {
+          for (int col = 0; col < ANN_SIZE; col++) {
+            float neuronValue = currentNonInputLayerValues[layer][row][col];
+            if (neuronValue > firingThreshold) {
+              currentFiredNeuronOneLayer.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+            } else {
+
+            }
+          }
+        }
+        currentFiredNeuronPos.push_back(currentFiredNeuronOneLayer);
+      }
+      for (vector<Vec3f> ol : currentFiredNeuronPos) {
+        //cout << "number of fired neurons in this layer: " << ol.size() << endl;
+      }
+
+      // Change this part of the logic
+      for (int startLayer = 0; startLayer < ANN_NUM_HIDDEN_LAYERS; startLayer++) {
+        
+        vector<Vec3f> startLayerPositions = currentFiredNeuronPos[startLayer];
+        vector<Vec3f> endLayerPositions = currentFiredNeuronPos[startLayer + 1];
+        for (Vec3f oneStartPosition : startLayerPositions) {
+          for (Vec3f oneEndPosition : endLayerPositions) {
+            ConnectionLines.vertex(oneStartPosition);
+            ConnectionLines.vertex(oneEndPosition);
+            ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
+          }
+        }
+      }
+      
+
+      
       
 
 
@@ -547,7 +601,9 @@ public:
   {
     g.clear(0.0);
     // synthManager.render(g); <- This is commented out because we show ANN but not the notes
+    g.meshColor();
     g.draw(ConnectionLines);
+
     g.shader(pointShader);
     g.blending(true);
     g.blendTrans();
