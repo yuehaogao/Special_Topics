@@ -53,9 +53,9 @@
 using namespace al;
 using namespace std;
 #define FFT_SIZE 4048
-#define ANN_SIZE 35
+#define ANN_SIZE 25
 #define ANN_NUM_HIDDEN_LAYERS 5
-#define REFRESH_THRESHOLD 30          // The refresh rate of oval
+
 #define CHANGE_MOTION_LOWER_LIMIT 180
 #define CHANGE_MOTION_UPPER_LIMIT 360
 
@@ -71,6 +71,8 @@ const float pointSize = 0.05;
 const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
+
+#define REFRESH_THRESHOLD 6          // The refresh rate of oval
 const float firingThreshold = 0.97;
 const float outputLayerFireThreshold = 0.9;
 
@@ -355,9 +357,9 @@ public:
         float z = 0.0;
 
         OutputLayer.vertex(Vec3f(x, y, z));
-        //state().outputLayerNeuronFixedPosition[opRow][opColumn] = Vec3f(x, y, z);
+        state().outputLayerNeuronFixedPosition[opRow][opColumn] = Vec3f(x, y, z);
         OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));  // Input layer initialized as white
-        //state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0.0f, 0.0f, 0.7f);
+        state().inputLayerNeuronRealTimeColor[opRow][opColumn] = HSV(0.0f, 0.0f, 0.7f);
         OutputLayer.texCoord(1.0, 0);
       }
     }
@@ -482,11 +484,16 @@ public:
         ovalRadiusY = canvasSize * OVAL_SMALLEST;
       }
 
+      // Construct a 2D array: [LAYER][POSITIONS OF FIRED NEURONS IN THIS LAYER]
+      vector<vector<Vec3f>> currentFiredNeuronPos;
+      
       // If a point in the input layer is inside the oval
       // Set that value as [1.0], otherwise set it as [0.0]
       // And brush it as light yellow
       InputLayer.colors().clear();
 
+      vector<Vec3f> currentFiredInputNeuronPos;
+      
       for (int row = 0; row < ANN_SIZE; row++) {
         vector<float> refreshedOneLine;
         for (int col = 0; col < ANN_SIZE; col++) {
@@ -499,6 +506,7 @@ public:
             InputLayer.color(HSV(0.17f, 1.0f, 1.0f));
             refreshedOneLine.push_back(1.0);
             state().inputLayerNeuronRealTimeColor[row][col] = HSV(0.17f, 1.0f, 1.0f);
+            currentFiredInputNeuronPos.push_back(state().inputLayerNeuronFixedPosition[row][col]);
           } else {
             InputLayer.color(HSV(0.0f, 0.0f, 0.7f));
             refreshedOneLine.push_back(0.0);
@@ -507,72 +515,61 @@ public:
         }
         refreshedInputMatrix.push_back(refreshedOneLine);
       }
+
+      currentFiredNeuronPos.push_back(currentFiredInputNeuronPos);
       liveInputMatrix = refreshedInputMatrix;
 
 
       // Step (2): feed the new input into the neural network -------------------------
       hiddenAndOutputNeurons.refreshInput(liveInputMatrix);
       
+
       // Step (3): refresh the list of firing neurons and the "lines" -----------------
       vector<vector<vector<float>>> currentNonInputLayerValues = hiddenAndOutputNeurons.getAllLayerOutput();
-      
+
       OutputLayer.colors().clear();
-      for (int row = 0; row < ANN_SIZE; row++) {
-        for (int col = 0; col < ANN_SIZE; col++) {
-          if (currentNonInputLayerValues[ANN_NUM_HIDDEN_LAYERS][row][col] > outputLayerFireThreshold) {
-            OutputLayer.color(HSV(0.17f, 1.0f, 1.0f));
-          } else {
-            OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
-          }
-        }
-      }
-      vector<vector<vector<bool>>> currentIsNeuronFiring;
-      
-      // for (vector<vector<float>> oneLayerValue : currentNonInputLayerValues) {
-      //   vector<vector<float>> currentIsNeuronFiringOneLayer;
-      //   for (vector<float> oneLineValue : oneLayerValue) {
-      //     vector<float> currentIsNeuronFiringOneLine;
-      //     for (float oneValue : oneLineValue) {
-      //       if (oneValue >= firingThreshold) {
-      //         currentIsNeuronFiringOneLine.push_back(true);
-      //       } else {
-      //         currentIsNeuronFiringOneLine.push_back(false);
-      //       }
-      //     }
-      //     currentIsNeuronFiringOneLayer.push_back(currentIsNeuronFiringOneLine);
-      //   }
-      //   currentIsNeuronFiring.push_back(currentIsNeuronFiringOneLayer);
-      // }
-
-      // isNeuronFired = currentIsNeuronFiring;
-
-      ConnectionLines.vertices().clear();
-      ConnectionLines.colors().clear();
-      
-      ConnectionLines.primitive(Mesh::LINES);
-      vector<vector<Vec3f>> currentFiredNeuronPos;
-      for (int layer = 0; layer < ANN_NUM_HIDDEN_LAYERS + 1; layer++) {
-        vector<Vec3f> currentFiredNeuronOneLayer;
+      HiddenLayers.colors().clear();
+      for (int layer = 0; layer <= ANN_NUM_HIDDEN_LAYERS; layer++) {
+        vector<Vec3f> currentFiredNonInputNeuronPos;
         for (int row = 0; row < ANN_SIZE; row++) {
           for (int col = 0; col < ANN_SIZE; col++) {
-            float neuronValue = currentNonInputLayerValues[layer][row][col];
-            if (neuronValue > firingThreshold) {
-              currentFiredNeuronOneLayer.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
-            } 
+            if (layer == ANN_NUM_HIDDEN_LAYERS) {
+              if (currentNonInputLayerValues[ANN_NUM_HIDDEN_LAYERS][row][col] > outputLayerFireThreshold) {
+                OutputLayer.color(HSV(0.17f, 1.0f, 1.0f));
+                currentFiredNonInputNeuronPos.push_back(state().outputLayerNeuronFixedPosition[row][col]);
+              } else {
+                OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
+              }
+            } else {
+              if (currentNonInputLayerValues[layer][row][col] > firingThreshold) {
+                HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
+                currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+              } else {
+                HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+              }
+            }  
           }
         }
-        currentFiredNeuronPos.push_back(currentFiredNeuronOneLayer);
+        currentFiredNeuronPos.push_back(currentFiredNonInputNeuronPos);
       }
 
-      for (vector<Vec3f> ol : currentFiredNeuronPos) {
-        //cout << "number of fired neurons in this layer: " << ol.size() << endl;
-      }
+      // cout << "number of layers of fired neuron pos: " << currentFiredNeuronPos.size() << endl;
+      // for (int i = 0; i < currentFiredNeuronPos.size(); i++) {
+      //   int currentLayerNeuronsFired = currentFiredNeuronPos[i].size();
+      //   cout << i << "'s layer fired " << currentLayerNeuronsFired << " neurons." << endl;
+      // }
 
-      // Change this part of the logic
-      for (int startLayer = 0; startLayer < ANN_NUM_HIDDEN_LAYERS; startLayer++) {
+
+      //ConnectionLines.primitive(Mesh::LINES);
+      ConnectionLines.colors().clear();
+      ConnectionLines.vertices().clear();
+
+      //for (int startLayer = 0; startLayer < currentFiredNeuronPos.size() - 1; startLayer++) {
+      for (int startLayer = 0; startLayer < currentFiredNeuronPos.size() - 1; startLayer++) {
         
         vector<Vec3f> startLayerPositions = currentFiredNeuronPos[startLayer];
         vector<Vec3f> endLayerPositions = currentFiredNeuronPos[startLayer + 1];
+
         for (Vec3f oneStartPosition : startLayerPositions) {
           for (Vec3f oneEndPosition : endLayerPositions) {
             ConnectionLines.vertex(oneStartPosition);
@@ -581,7 +578,7 @@ public:
           }
         }
       }
-      
+      ConnectionLines.primitive(Mesh::LINES);
 
     } else {
       frameCount += 1;
