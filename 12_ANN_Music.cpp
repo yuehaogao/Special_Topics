@@ -151,7 +151,7 @@ public:
     mMesh.decompress();
     mMesh.generateNormals();
 
-    createInternalTriggerParameter("amplitude", 0.03, 0.0, 1.0);
+    createInternalTriggerParameter("amplitude", 0.03, 0.0, 0.1);
     createInternalTriggerParameter("frequency", 60, 20, 5000);
     createInternalTriggerParameter("attackTime", 0.66, 0.01, 3.0);
     createInternalTriggerParameter("releaseTime", 1.5, 0.1, 10.0);
@@ -307,6 +307,10 @@ public:
     if (!createPointShaderSuccess) {
       exit(1);
     }
+
+    state().pointSize = pointSize;
+    state().pointDistance = pointDistance;
+    state().layerDistance = layerDistance;
 
     // Set up the parameters for the oval
     frameCount = 0;
@@ -466,12 +470,13 @@ public:
     // The GUI is prepared here
     imguiBeginFrame();
     frameIndex += 1;
-    
   
     if (frameCount >= REFRESH_THRESHOLD) {
       frameCount = 0;
 
       if (isPrimary()) {
+        state().pose = nav();
+
         // Step (1): stop the MIDI notes in the previous turn
         for (int oneNote : MIDINoteTriggeredLastTime) {
          synthManager.triggerOff(oneNote);
@@ -519,7 +524,6 @@ public:
         // Set that value as [1.0], otherwise set it as [0.0]
         // And brush it as light yellow
         InputLayer.colors().clear();
-
         vector<Vec3f> currentFiredInputNeuronPos;
       
         for (int row = 0; row < ANN_SIZE; row++) {
@@ -562,6 +566,7 @@ public:
               if (layer == ANN_NUM_HIDDEN_LAYERS) {
                 if (currentNonInputLayerValues[ANN_NUM_HIDDEN_LAYERS][row][col] > outputLayerFireThreshold) {
                   OutputLayer.color(HSV(0.17f, 1.0f, 1.0f));
+                  state().outputLayerNeuronRealTimeColor[row][col] = HSV(0.17f, 1.0f, 1.0f);
                   currentFiredNonInputNeuronPos.push_back(state().outputLayerNeuronFixedPosition[row][col]);
 
                   int xDistToCenter = abs(col - (int)(0.5 * ANN_SIZE));
@@ -576,21 +581,26 @@ public:
                   }
                 } else {
                   OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
+                  state().outputLayerNeuronRealTimeColor[row][col] = HSV(0.0f, 0.0f, 0.7f);
                 }
               } else {
                 if (layer > 0) {
                   if (currentNonInputLayerValues[layer][row][col] > firingThreshold) {
                     HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
+                    state().hiddenLayerNeuronRealTimeColor[layer][row][col] = HSV(0.17f, 0.8f, 1.0f);
                     currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
                   } else {
                     HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                    state().hiddenLayerNeuronRealTimeColor[layer][row][col] = HSV(0.0f, 1.0f, 0.3f);
                   }
                 } else {
                   if (currentNonInputLayerValues[layer][row][col] > inputLayerFireThreshold) {
                     HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
+                    state().hiddenLayerNeuronRealTimeColor[layer][row][col] = HSV(0.17f, 0.8f, 1.0f);
                     currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
                   } else {
                     HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                    state().hiddenLayerNeuronRealTimeColor[layer][row][col] = HSV(0.0f, 1.0f, 0.3f);
                   }
                 }
               }  
@@ -602,9 +612,27 @@ public:
         ConnectionLines.colors().clear();
         ConnectionLines.vertices().clear();
 
+        // Vec3f emptyPositions[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
+        // HSV emptyColors[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
+
+        //cout << "TYPE OF ORIGINAL LIST: " << typeid(state().linesStartingFixedPosition).name() << endl;
+        for (int layer = 0; layer < ANN_NUM_HIDDEN_LAYERS + 1; layer++) {
+          for (int line = 0; line < ANN_SIZE * ANN_SIZE; line++) {
+            // state().linesStartingFixedPosition[layer][line] = Vec3f(0.0, 0.0, 30.0);
+            // state().linesEndingFixedPosition[layer][line] = Vec3f(0.0, 0.0, 30.0);
+            // state().linesRealTimeColor[layer][line] = HSV(0.0f, 0.0f, 0.0f);
+          }
+
+        }
+
+
+        int lineIteration = 0;
+
         for (int startLayer = 0; startLayer < currentFiredNeuronPos.size() - 1; startLayer++) {
           vector<Vec3f> startLayerPositions = currentFiredNeuronPos[startLayer];
           vector<Vec3f> endLayerPositions = currentFiredNeuronPos[startLayer + 1];
+
+          int lineIteration = 0;
 
           for (Vec3f oneStartPosition : startLayerPositions) {
            for (Vec3f oneEndPosition : endLayerPositions) {
@@ -612,24 +640,64 @@ public:
               ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
               ConnectionLines.vertex(oneEndPosition);
               ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
+
+              // state().linesStartingFixedPosition[startLayer][lineIteration] = oneStartPosition;
+              // state().linesEndingFixedPosition[startLayer][lineIteration] = oneEndPosition;
+              // state().linesRealTimeColor[startLayer][lineIteration] = HSV(0.17f, 1.0f, 1.0f);
+
+              lineIteration += 1;
             }
           }
         }
         ConnectionLines.primitive(Mesh::LINES);
 
+        // Draw a window that contains the synth control panel
+        // Refresh & is primary
+        synthManager.drawSynthControlPanel();
+        imguiEndFrame();
+        navControl().active(navi);
+
       } else {
+        nav().set(state().pose);
+
+        InputLayer.colors().clear();
+        for (int row = 0; row < ANN_SIZE; row++) {
+          for (int col = 0; col < ANN_SIZE; col++) {
+            InputLayer.color(state().inputLayerNeuronRealTimeColor[row][col]);
+          }
+        }
+
+        HiddenLayers.colors().clear();
+        for (int layer = 0; layer < ANN_NUM_HIDDEN_LAYERS; layer++) {
+          for (int row = 0; row < ANN_SIZE; row++) {
+            for (int col = 0; col < ANN_SIZE; col++) {
+              HiddenLayers.color(state().hiddenLayerNeuronRealTimeColor[layer][row][col]);
+            }
+          }
+        }
+
+        OutputLayer.colors().clear();
+        for (int row = 0; row < ANN_SIZE; row++) {
+          for (int col = 0; col < ANN_SIZE; col++) {
+            OutputLayer.color(state().outputLayerNeuronRealTimeColor[row][col]);
+          }
+        }
 
       }
-      
 
     } else {
       frameCount += 1;
+      if (isPrimary()) {
+        state().pose = nav();
+
+        // Not refresh & is primary
+        synthManager.drawSynthControlPanel();
+        imguiEndFrame();
+        navControl().active(navi);
+      } else {
+        nav().set(state().pose);
+      }
     }
-    
-    // Draw a window that contains the synth control panel
-    synthManager.drawSynthControlPanel();
-    imguiEndFrame();
-    navControl().active(navi);
   }
 
 
