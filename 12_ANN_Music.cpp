@@ -108,7 +108,7 @@ const float outputLayerFireThreshold = 0.9;
 #define WHITE_S 0.0
 #define WHITE_V 100.0
 
-const int linePosArchiveSize = (ANN_NUM_HIDDEN_LAYERS + 2) * ANN_SIZE * ANN_SIZE * 2;
+const int linePosArchiveSize = ANN_SIZE * ANN_SIZE * ANN_SIZE * ANN_SIZE;
 const float pointSize = 0.05;
 const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
@@ -216,14 +216,10 @@ public:
 // ----------------------------------------------------------------------
 // The shared state between local and the Allosphere Terminal
 struct CommonState {
-
   Pose pose;    
   float pointSize;
   float pointDistance;
   float layerDistance;
-
-  // *** 
-  // These 2D and 3D arrays are causing "al_OSC.cpp" to complain
 
   // Neuron Points
   Vec3f inputLayerNeuronFixedPosition[ANN_SIZE][ANN_SIZE];
@@ -237,9 +233,6 @@ struct CommonState {
   Vec3f linesStartingFixedPosition[linePosArchiveSize];
   Vec3f linesEndingFixedPosition[linePosArchiveSize];
   HSV linesRealTimeColor;
-  
-  //***
-
 };
 
 
@@ -422,6 +415,8 @@ public:
     if (!cuttleboneDomain) {
       std::cerr << "ERROR: Could not start Cuttlebone. Quitting." << std::endl;
       quit();
+    } else {
+      cout << "Successfully Created Cuttlebone Domain" << endl;
     }
 
     if (isPrimary()) {
@@ -851,7 +846,15 @@ public:
     return true;
   }
 
-  void onExit() override { imguiShutdown(); }
+  void onExit() override { 
+    imguiShutdown(); 
+    InputLayer.vertices().clear();
+    InputLayer.colors().clear();
+    HiddenLayers.vertices().clear();
+    HiddenLayers.colors().clear();
+    OutputLayer.vertices().clear();
+    OutputLayer.colors().clear();
+  }
 };
 
 
