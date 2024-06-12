@@ -108,6 +108,7 @@ const float outputLayerFireThreshold = 0.9;
 #define WHITE_S 0.0
 #define WHITE_V 100.0
 
+const int linePosArchiveSize = (ANN_NUM_HIDDEN_LAYERS + 2) * ANN_SIZE * ANN_SIZE * 2;
 const float pointSize = 0.05;
 const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
@@ -233,9 +234,9 @@ struct CommonState {
   HSV outputLayerNeuronRealTimeColor[ANN_SIZE][ANN_SIZE];
 
   // Lines
-  Vec3f linesStartingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
-  Vec3f linesEndingFixedPosition[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
-  HSV linesRealTimeColor[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
+  Vec3f linesStartingFixedPosition[linePosArchiveSize];
+  Vec3f linesEndingFixedPosition[linePosArchiveSize];
+  HSV linesRealTimeColor;
   
   //***
 
@@ -311,6 +312,12 @@ public:
     state().pointSize = pointSize;
     state().pointDistance = pointDistance;
     state().layerDistance = layerDistance;
+
+    state().linesRealTimeColor = HSV(0.17f, 1.0f, 1.0f);
+    for (int i = 0; i < linePosArchiveSize; i++) {
+      state().linesStartingFixedPosition[i] = Vec3f(0.0, 0.0, 30.0);
+      state().linesEndingFixedPosition[i] = Vec3f(0.0, 0.0, 30.0);
+    }
 
     // Set up the parameters for the oval
     frameCount = 0;
@@ -612,17 +619,11 @@ public:
         ConnectionLines.colors().clear();
         ConnectionLines.vertices().clear();
 
-        // Vec3f emptyPositions[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
-        // HSV emptyColors[(ANN_NUM_HIDDEN_LAYERS + 1)][ANN_SIZE * ANN_SIZE];
 
         //cout << "TYPE OF ORIGINAL LIST: " << typeid(state().linesStartingFixedPosition).name() << endl;
-        for (int layer = 0; layer < ANN_NUM_HIDDEN_LAYERS + 1; layer++) {
-          for (int line = 0; line < ANN_SIZE * ANN_SIZE; line++) {
-            // state().linesStartingFixedPosition[layer][line] = Vec3f(0.0, 0.0, 30.0);
-            // state().linesEndingFixedPosition[layer][line] = Vec3f(0.0, 0.0, 30.0);
-            // state().linesRealTimeColor[layer][line] = HSV(0.0f, 0.0f, 0.0f);
-          }
-
+        for (int i = 0; i < linePosArchiveSize; i++) {
+            state().linesStartingFixedPosition[i] = Vec3f(0.0, 0.0, 30.0);
+            state().linesEndingFixedPosition[i] = Vec3f(0.0, 0.0, 30.0);
         }
 
 
@@ -632,8 +633,6 @@ public:
           vector<Vec3f> startLayerPositions = currentFiredNeuronPos[startLayer];
           vector<Vec3f> endLayerPositions = currentFiredNeuronPos[startLayer + 1];
 
-          int lineIteration = 0;
-
           for (Vec3f oneStartPosition : startLayerPositions) {
            for (Vec3f oneEndPosition : endLayerPositions) {
               ConnectionLines.vertex(oneStartPosition);
@@ -641,9 +640,8 @@ public:
               ConnectionLines.vertex(oneEndPosition);
               ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
 
-              // state().linesStartingFixedPosition[startLayer][lineIteration] = oneStartPosition;
-              // state().linesEndingFixedPosition[startLayer][lineIteration] = oneEndPosition;
-              // state().linesRealTimeColor[startLayer][lineIteration] = HSV(0.17f, 1.0f, 1.0f);
+              state().linesStartingFixedPosition[lineIteration] = oneStartPosition;
+              state().linesEndingFixedPosition[lineIteration] = oneEndPosition;
 
               lineIteration += 1;
             }
@@ -681,6 +679,15 @@ public:
           for (int col = 0; col < ANN_SIZE; col++) {
             OutputLayer.color(state().outputLayerNeuronRealTimeColor[row][col]);
           }
+        }
+
+        ConnectionLines.vertices().clear();
+        ConnectionLines.colors().clear();
+        for (int line = 0; line < linePosArchiveSize; line++) {
+          ConnectionLines.vertex(state().linesStartingFixedPosition[line]);
+          ConnectionLines.color(state().linesRealTimeColor);
+          ConnectionLines.vertex(state().linesEndingFixedPosition[line]);
+          ConnectionLines.color(state().linesRealTimeColor);
         }
 
       }
