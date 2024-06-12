@@ -74,9 +74,9 @@ const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
 
-#define REFRESH_THRESHOLD 15          // The refresh rate of oval
+#define REFRESH_THRESHOLD 60          // The refresh rate of oval
 const float firingThreshold = 0.97;
-const float outputLayerFireThreshold = 0.99;
+const float outputLayerFireThreshold = 0.95;
 
 
 
@@ -587,6 +587,7 @@ public:
         for (Vec3f oneStartPosition : startLayerPositions) {
           for (Vec3f oneEndPosition : endLayerPositions) {
             ConnectionLines.vertex(oneStartPosition);
+            ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
             ConnectionLines.vertex(oneEndPosition);
             ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
           }
@@ -625,12 +626,13 @@ public:
     g.draw(InputLayer);
     g.shader().uniform("pointSize", 0.05);
     g.draw(HiddenLayers);
+    g.shader().uniform("pointSize", 0.12);
     g.draw(OutputLayer);
     
 
     // Draw Spectrum
     // Commented out for testing drawing the meshes of ANN only
-    ///*
+    /*
     mSpectrogram.reset();
     mSpectrogram.primitive(Mesh::LINE_STRIP);
     if (showSpectro)
@@ -647,6 +649,7 @@ public:
       g.draw(mSpectrogram);
       g.popMatrix();
     }
+    */
     // GUI is drawn here
     if (showGUI)
     {
@@ -655,7 +658,7 @@ public:
       // defined on line (): auto& gui = GUIdomain->newGUI();
       // with more adjustable parameters?
     }
-    //*/
+    
   }
 
 
@@ -768,14 +771,6 @@ string slurp(string fileName) {
 
 int main()
 {
-  // Create app instance
-  // MyApp app;
-
-  // // Set up audio
-  // app.configureAudio(48000., 512, 2, 0);
-  // app.start();
-  // return 0;
-
   MyApp app;
 
   if (al::Socket::hostName() == "ar01.1g") {
