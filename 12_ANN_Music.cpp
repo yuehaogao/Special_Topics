@@ -50,8 +50,6 @@
 // ----------------------------------------------------------------
 
 
-
-
 #include <cmath>
 #include <cstdio>
 #include <stdio.h>
@@ -59,12 +57,8 @@
 #include <fstream>
 #include <time.h> 
 
-#include "Gamma/Analysis.h"
-#include "Gamma/Effects.h"
-#include "Gamma/Envelope.h"
-#include "Gamma/Oscillator.h"
-#include "Gamma/DFT.h"
 //#include "al/app/al_App.hpp"
+#include "ANN.cpp"   // The ANN Class defined
 #include "al/app/al_DistributedApp.hpp"
 #include "al/app/al_GUIDomain.hpp"
 #include "al_ext/statedistribution/al_CuttleboneDomain.hpp"
@@ -76,12 +70,16 @@
 #include "al/scene/al_SynthSequencer.hpp"
 #include "al/ui/al_ControlGUI.hpp"
 #include "al/ui/al_Parameter.hpp"
-
-#include "ANN.cpp"   // The ANN Class defined
+#include "Gamma/Analysis.h"
+#include "Gamma/Effects.h"
+#include "Gamma/Envelope.h"
+#include "Gamma/Oscillator.h"
+#include "Gamma/DFT.h"
 
 // using namespace gam;
 using namespace al;
 using namespace std;
+
 
 
 // * ----------------------------------- *
@@ -98,24 +96,21 @@ const float outputLayerFireThreshold = 0.9;
 // * ----------------------------------- *
 
 
-#define FFT_SIZE 4048
+
 #define CHANGE_MOTION_LOWER_LIMIT 180
 #define CHANGE_MOTION_UPPER_LIMIT 360
-#define WHITE_H 0.0
-#define WHITE_S 0.0
-#define WHITE_V 100.0
-#define PI 3.1415926535
+#define FFT_SIZE 4048
 #define OVAL_MARCHING_SPEED 0.09
 #define OVAL_LARGEST 0.3
 #define OVAL_SMALLEST 0.15
+#define PI 3.1415926535
+#define WHITE_H 0.0
+#define WHITE_S 0.0
+#define WHITE_V 100.0
 
 const float pointSize = 0.05;
 const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
-const float lineWidth = 0.5;
-
-
-
 
 
 // This example shows how to use SynthVoice and SynthManagerto create an audio
@@ -225,7 +220,6 @@ struct CommonState {
   float pointSize;
   float pointDistance;
   float layerDistance;
-  float lineWidth;
 
   // *** 
   // These 2D and 3D arrays are causing "al_OSC.cpp" to complain
@@ -354,13 +348,6 @@ public:
         float x = (ipRow - (ANN_SIZE * 0.5)) * pointDistance;
         float y = (ipColumn - (ANN_SIZE * 0.5)) * pointDistance;
         float z = (ANN_NUM_HIDDEN_LAYERS + 1) * layerDistance;
-
-        // addCube(InputLayer);
-        // Mat4f xfm;
-        // xfm.setIdentity;
-        // xfm.scale(Vec3f(pointSize, pointSize, pointSize));
-        // xfm.translate(Vec3f(x, y, z));
-        // InputLayer.transform(xfm, InputLayer.vertices().size());
 
         InputLayer.vertex(Vec3f(x, y, z));
         state().inputLayerNeuronFixedPosition[ipRow][ipColumn] = Vec3f(x, y, z);
@@ -594,8 +581,6 @@ public:
                    
                    MIDINoteTriggeredLastTime.push_back(midiNote);
                   }
-                  
-                
               } else {
                 OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
               }
@@ -615,25 +600,15 @@ public:
                   HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
                 }
               }
-              
             }  
           }
         }
         currentFiredNeuronPos.push_back(currentFiredNonInputNeuronPos);
       }
 
-      // cout << "number of layers of fired neuron pos: " << currentFiredNeuronPos.size() << endl;
-      // for (int i = 0; i < currentFiredNeuronPos.size(); i++) {
-      //   int currentLayerNeuronsFired = currentFiredNeuronPos[i].size();
-      //   cout << i << "'s layer fired " << currentLayerNeuronsFired << " neurons." << endl;
-      // }
-
-
-      //ConnectionLines.primitive(Mesh::LINES);
       ConnectionLines.colors().clear();
       ConnectionLines.vertices().clear();
 
-      //for (int startLayer = 0; startLayer < currentFiredNeuronPos.size() - 1; startLayer++) {
       for (int startLayer = 0; startLayer < currentFiredNeuronPos.size() - 1; startLayer++) {
         
         vector<Vec3f> startLayerPositions = currentFiredNeuronPos[startLayer];
@@ -654,7 +629,6 @@ public:
       frameCount += 1;
     }
     
-
     // Draw a window that contains the synth control panel
     synthManager.drawSynthControlPanel();
     imguiEndFrame();
@@ -686,7 +660,7 @@ public:
 
     // Draw Spectrum
     // Commented out for testing drawing the meshes of ANN only
-    /*
+    ///*
     mSpectrogram.reset();
     mSpectrogram.primitive(Mesh::LINE_STRIP);
     if (showSpectro)
@@ -703,7 +677,7 @@ public:
       g.draw(mSpectrogram);
       g.popMatrix();
     }
-    */
+    //*/
     // GUI is drawn here
     if (showGUI)
     {
