@@ -66,9 +66,10 @@ const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
 
-#define REFRESH_THRESHOLD 60          // The refresh rate of oval
-const float firingThreshold = 0.97;
-const float outputLayerFireThreshold = 0.95;
+#define REFRESH_THRESHOLD 30          // The refresh rate of oval
+const float firingThreshold = 0.66;
+const float inputLayerFireThreshold = 0.33;
+const float outputLayerFireThreshold = 0.9;
 
 
 
@@ -110,16 +111,10 @@ public:
     mMesh.decompress();
     mMesh.generateNormals();
 
-    // This is a quick way to create parameters for the voice. Trigger
-    // parameters are meant to be set only when the voice starts, i.e. they
-    // are expected to be constant within a voice instance. (You can actually
-    // change them while you are prototyping, but their changes will only be
-    // stored and aplied when a note is triggered.)
-
-    createInternalTriggerParameter("amplitude", 0.3, 0.0, 1.0);
+    createInternalTriggerParameter("amplitude", 0.03, 0.0, 1.0);
     createInternalTriggerParameter("frequency", 60, 20, 5000);
-    createInternalTriggerParameter("attackTime", 1.0, 0.01, 3.0);
-    createInternalTriggerParameter("releaseTime", 3.0, 0.1, 10.0);
+    createInternalTriggerParameter("attackTime", 0.66, 0.01, 3.0);
+    createInternalTriggerParameter("releaseTime", 1.5, 0.1, 10.0);
     createInternalTriggerParameter("pan", 0.0, -1.0, 1.0);
 
     // Initalize MIDI device input
@@ -224,7 +219,7 @@ public:
   vector<float> spectrum;
   bool showGUI = true;
   bool showSpectro = true;
-  bool navi = false;
+  bool navi = true;
 
   int frameCount;
   int frameIndex;
@@ -547,24 +542,35 @@ public:
                 int yDistToCenter = abs(row - (int)(0.5 * ANN_SIZE));
                 int midiNote = 36 + 2 * (int)(sqrt(xDistToCenter * xDistToCenter + yDistToCenter * yDistToCenter));
                 if (midiNote > 0)
-                 {
-                   synthManager.voice()->setInternalParameterValue(
-                        "frequency", ::pow(2.f, (midiNote - 69.f) / 12.f) * 432.f);
-                   synthManager.triggerOn(midiNote);
+                  {
+                    synthManager.voice()->setInternalParameterValue(
+                      "frequency", ::pow(2.f, (midiNote - 69.f) / 12.f) * 432.f);
+                    synthManager.triggerOn(midiNote);
                    
                    MIDINoteTriggeredLastTime.push_back(midiNote);
-                 }
+                  }
+                  
                 
               } else {
                 OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
               }
             } else {
-              if (currentNonInputLayerValues[layer][row][col] > firingThreshold) {
-                HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
-                currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+              if (layer > 0) {
+                if (currentNonInputLayerValues[layer][row][col] > firingThreshold) {
+                  HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
+                  currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+                } else {
+                  HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                }
               } else {
-                HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                if (currentNonInputLayerValues[layer][row][col] > inputLayerFireThreshold) {
+                  HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
+                  currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+                } else {
+                  HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                }
               }
+              
             }  
           }
         }
