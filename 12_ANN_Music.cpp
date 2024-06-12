@@ -266,8 +266,7 @@ public:
 
   // ------------------ OUR PRESCIOUS ANN STRUCTURE ------------------
   NonInputLayers hiddenAndOutputNeurons = NonInputLayers(ANN_NUM_HIDDEN_LAYERS, ANN_SIZE);  // The hidden neurons that producing the data output
-  vector<vector<float>> liveInputMatrix;                                                 // The live input matrix
-  //vector<vector<vector<bool>>> isNeuronFired;                                            // The live referee tracking if each neurion is "lit up"
+  vector<vector<float>> liveInputMatrix;   
   // -----------------------------------------------------------------
 
   // Parameters for the oval
@@ -330,18 +329,14 @@ public:
     // Initialize the input values and the neuron activity referee
     vector<vector<float>> initialLiveInputMatrix(ANN_SIZE, vector<float>(ANN_SIZE, 0.0f));
     liveInputMatrix = initialLiveInputMatrix;
-    // vector<vector<vector<bool>>> initialIsNeuronFired((ANN_NUM_HIDDEN_LAYERS + 1), vector<vector<bool>>(ANN_SIZE, vector<bool>(ANN_SIZE, false)));
-    // isNeuronFired = initialIsNeuronFired;
 
     // ------------------------------------------------------------
     // Initialize parameters for all meshes
-
     InputLayer.primitive(Mesh::POINTS);
     HiddenLayers.primitive(Mesh::POINTS);
     OutputLayer.primitive(Mesh::POINTS);
     ConnectionLines.primitive(Mesh::LINES);
 
-    
     // The input layer
     for (int ipRow = 0; ipRow < ANN_SIZE; ipRow++) {
       for (int ipColumn = 0; ipColumn < ANN_SIZE; ipColumn++) {
@@ -388,7 +383,6 @@ public:
         OutputLayer.texCoord(1.0, 0);
       }
     }
-    
     
     
     // ------------------------------------------------------------
@@ -472,158 +466,161 @@ public:
     // The GUI is prepared here
     imguiBeginFrame();
     frameIndex += 1;
-   
+    
+  
     if (frameCount >= REFRESH_THRESHOLD) {
       frameCount = 0;
 
-      // Step (1): stop the MIDI notes in the previous turn
-      for (int oneNote : MIDINoteTriggeredLastTime) {
-        synthManager.triggerOff(oneNote);
-      }
-      vector<int> emptyIntegerList;
-      MIDINoteTriggeredLastTime = emptyIntegerList;
-
-      // Step (2): refresh the input value and color according to the movement of the circle -------------------------
-      vector<vector<float>> refreshedInputMatrix;
-      ovalCenterX += ovalDX;
-      ovalCenterY += ovalDY;
-      if ((((ovalCenterX - ovalRadiusX) <= (canvasSize * -0.5)) && (ovalDX < 0.0))
-        || (((ovalCenterX + ovalRadiusX) >= (canvasSize * 0.5)) && (ovalDX > 0.0))) {
-          ovalDX *= -1;
-      }
-      if ((((ovalCenterY - ovalRadiusY) <= (canvasSize * -0.5)) && (ovalDY < 0.0))
-        || (((ovalCenterY + ovalRadiusY) >= (canvasSize * 0.5)) && (ovalDY > 0.0))) {
-          ovalDY *= -1;
-      }
-      if (frameIndex > ovalNextChangeTimeX) {
-        ovalSizeChangeDirectionX *= -1;
-        ovalNextChangeTimeX = frameIndex + CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
-      }
-      if (frameIndex > ovalNextChangeTimeY) {
-        ovalSizeChangeDirectionY *= -1;
-        ovalNextChangeTimeY = frameIndex + CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
-      }
-      if (ovalRadiusX > canvasSize * OVAL_LARGEST) {
-        ovalRadiusX = canvasSize * OVAL_LARGEST;
-      }
-      if (ovalRadiusX < canvasSize * OVAL_SMALLEST) {
-        ovalRadiusX = canvasSize * OVAL_SMALLEST;
-      }
-      if (ovalRadiusY > canvasSize * OVAL_LARGEST) {
-        ovalRadiusY = canvasSize * OVAL_LARGEST;
-      }
-      if (ovalRadiusY < canvasSize * OVAL_SMALLEST) {
-        ovalRadiusY = canvasSize * OVAL_SMALLEST;
-      }
-
-      // Construct a 2D array: [LAYER][POSITIONS OF FIRED NEURONS IN THIS LAYER]
-      vector<vector<Vec3f>> currentFiredNeuronPos;
-      
-      // If a point in the input layer is inside the oval
-      // Set that value as [1.0], otherwise set it as [0.0]
-      // And brush it as light yellow
-      InputLayer.colors().clear();
-
-      vector<Vec3f> currentFiredInputNeuronPos;
-      
-      for (int row = 0; row < ANN_SIZE; row++) {
-        vector<float> refreshedOneLine;
-        for (int col = 0; col < ANN_SIZE; col++) {
-          float x = (row - (ANN_SIZE * 0.5)) * pointDistance;
-          float y = (col - (ANN_SIZE * 0.5)) * pointDistance;
-          float distanceX = abs(x - ovalCenterX) / ovalRadiusX;
-          float distanceY = abs(y - ovalCenterY) / ovalRadiusY;
-          float distance = sqrt(distanceX * distanceX + distanceY * distanceY);
-          if (distance <= 1) {
-            InputLayer.color(HSV(0.17f, 1.0f, 1.0f));
-            refreshedOneLine.push_back(1.0);
-            state().inputLayerNeuronRealTimeColor[row][col] = HSV(0.17f, 1.0f, 1.0f);
-            currentFiredInputNeuronPos.push_back(state().inputLayerNeuronFixedPosition[row][col]);
-          } else {
-            InputLayer.color(HSV(0.0f, 0.0f, 0.7f));
-            refreshedOneLine.push_back(0.0);
-            state().inputLayerNeuronRealTimeColor[row][col] = HSV(0.0f, 0.0f, 0.7f);
-          }
+      if (isPrimary()) {
+        // Step (1): stop the MIDI notes in the previous turn
+        for (int oneNote : MIDINoteTriggeredLastTime) {
+         synthManager.triggerOff(oneNote);
         }
-        refreshedInputMatrix.push_back(refreshedOneLine);
-      }
+        vector<int> emptyIntegerList;
+        MIDINoteTriggeredLastTime = emptyIntegerList;
 
-      currentFiredNeuronPos.push_back(currentFiredInputNeuronPos);
-      liveInputMatrix = refreshedInputMatrix;
+        // Step (2): refresh the input value and color according to the movement of the circle -------------------------
+        vector<vector<float>> refreshedInputMatrix;
+        ovalCenterX += ovalDX;
+        ovalCenterY += ovalDY;
+        if ((((ovalCenterX - ovalRadiusX) <= (canvasSize * -0.5)) && (ovalDX < 0.0))
+          || (((ovalCenterX + ovalRadiusX) >= (canvasSize * 0.5)) && (ovalDX > 0.0))) {
+            ovalDX *= -1;
+        }
+        if ((((ovalCenterY - ovalRadiusY) <= (canvasSize * -0.5)) && (ovalDY < 0.0))
+          || (((ovalCenterY + ovalRadiusY) >= (canvasSize * 0.5)) && (ovalDY > 0.0))) {
+            ovalDY *= -1;
+        }
+        if (frameIndex > ovalNextChangeTimeX) {
+          ovalSizeChangeDirectionX *= -1;
+          ovalNextChangeTimeX = frameIndex + CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
+        }
+        if (frameIndex > ovalNextChangeTimeY) {
+          ovalSizeChangeDirectionY *= -1;
+          ovalNextChangeTimeY = frameIndex + CHANGE_MOTION_LOWER_LIMIT + rnd::uniform(CHANGE_MOTION_UPPER_LIMIT - CHANGE_MOTION_LOWER_LIMIT);
+        }
+        if (ovalRadiusX > canvasSize * OVAL_LARGEST) {
+          ovalRadiusX = canvasSize * OVAL_LARGEST;
+        }
+        if (ovalRadiusX < canvasSize * OVAL_SMALLEST) {
+          ovalRadiusX = canvasSize * OVAL_SMALLEST;
+        }
+        if (ovalRadiusY > canvasSize * OVAL_LARGEST) {
+          ovalRadiusY = canvasSize * OVAL_LARGEST;
+        }
+        if (ovalRadiusY < canvasSize * OVAL_SMALLEST) {
+          ovalRadiusY = canvasSize * OVAL_SMALLEST;
+        }
 
-
-      // Step (3): feed the new input into the neural network -------------------------
-      hiddenAndOutputNeurons.refreshInput(liveInputMatrix);
+        // Construct a 2D array: [LAYER][POSITIONS OF FIRED NEURONS IN THIS LAYER]
+        vector<vector<Vec3f>> currentFiredNeuronPos;
       
+        // If a point in the input layer is inside the oval
+        // Set that value as [1.0], otherwise set it as [0.0]
+        // And brush it as light yellow
+        InputLayer.colors().clear();
 
-      // Step (4): refresh the list of firing neurons and the "lines" -----------------
-      vector<vector<vector<float>>> currentNonInputLayerValues = hiddenAndOutputNeurons.getAllLayerOutput();
-
-      OutputLayer.colors().clear();
-      HiddenLayers.colors().clear();
-      for (int layer = 0; layer <= ANN_NUM_HIDDEN_LAYERS; layer++) {
-        vector<Vec3f> currentFiredNonInputNeuronPos;
+        vector<Vec3f> currentFiredInputNeuronPos;
+      
         for (int row = 0; row < ANN_SIZE; row++) {
+          vector<float> refreshedOneLine;
           for (int col = 0; col < ANN_SIZE; col++) {
-            if (layer == ANN_NUM_HIDDEN_LAYERS) {
-              if (currentNonInputLayerValues[ANN_NUM_HIDDEN_LAYERS][row][col] > outputLayerFireThreshold) {
-                OutputLayer.color(HSV(0.17f, 1.0f, 1.0f));
-                currentFiredNonInputNeuronPos.push_back(state().outputLayerNeuronFixedPosition[row][col]);
-
-                int xDistToCenter = abs(col - (int)(0.5 * ANN_SIZE));
-                int yDistToCenter = abs(row - (int)(0.5 * ANN_SIZE));
-                int midiNote = 36 + 2 * (int)(sqrt(xDistToCenter * xDistToCenter + yDistToCenter * yDistToCenter));
-                if (midiNote > 0)
-                  {
-                    synthManager.voice()->setInternalParameterValue(
-                      "frequency", ::pow(2.f, (midiNote - 69.f) / 12.f) * 432.f);
-                    synthManager.triggerOn(midiNote);
-                   
-                   MIDINoteTriggeredLastTime.push_back(midiNote);
-                  }
-              } else {
-                OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
-              }
+            float x = (row - (ANN_SIZE * 0.5)) * pointDistance;
+            float y = (col - (ANN_SIZE * 0.5)) * pointDistance;
+            float distanceX = abs(x - ovalCenterX) / ovalRadiusX;
+            float distanceY = abs(y - ovalCenterY) / ovalRadiusY;
+            float distance = sqrt(distanceX * distanceX + distanceY * distanceY);
+            if (distance <= 1) {
+              InputLayer.color(HSV(0.17f, 1.0f, 1.0f));
+              refreshedOneLine.push_back(1.0);
+              state().inputLayerNeuronRealTimeColor[row][col] = HSV(0.17f, 1.0f, 1.0f);
+              currentFiredInputNeuronPos.push_back(state().inputLayerNeuronFixedPosition[row][col]);
             } else {
-              if (layer > 0) {
-                if (currentNonInputLayerValues[layer][row][col] > firingThreshold) {
-                  HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
-                  currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+              InputLayer.color(HSV(0.0f, 0.0f, 0.7f));
+              refreshedOneLine.push_back(0.0);
+              state().inputLayerNeuronRealTimeColor[row][col] = HSV(0.0f, 0.0f, 0.7f);
+            }
+          }
+          refreshedInputMatrix.push_back(refreshedOneLine);
+        }
+
+        currentFiredNeuronPos.push_back(currentFiredInputNeuronPos);
+        liveInputMatrix = refreshedInputMatrix;
+
+        // Step (3): feed the new input into the neural network -------------------------
+        hiddenAndOutputNeurons.refreshInput(liveInputMatrix);
+      
+        // Step (4): refresh the list of firing neurons and the "lines" -----------------
+        vector<vector<vector<float>>> currentNonInputLayerValues = hiddenAndOutputNeurons.getAllLayerOutput();
+
+        OutputLayer.colors().clear();
+        HiddenLayers.colors().clear();
+        for (int layer = 0; layer <= ANN_NUM_HIDDEN_LAYERS; layer++) {
+          vector<Vec3f> currentFiredNonInputNeuronPos;
+          for (int row = 0; row < ANN_SIZE; row++) {
+            for (int col = 0; col < ANN_SIZE; col++) {
+              if (layer == ANN_NUM_HIDDEN_LAYERS) {
+                if (currentNonInputLayerValues[ANN_NUM_HIDDEN_LAYERS][row][col] > outputLayerFireThreshold) {
+                  OutputLayer.color(HSV(0.17f, 1.0f, 1.0f));
+                  currentFiredNonInputNeuronPos.push_back(state().outputLayerNeuronFixedPosition[row][col]);
+
+                  int xDistToCenter = abs(col - (int)(0.5 * ANN_SIZE));
+                  int yDistToCenter = abs(row - (int)(0.5 * ANN_SIZE));
+                  int midiNote = 36 + 2 * (int)(sqrt(xDistToCenter * xDistToCenter + yDistToCenter * yDistToCenter));
+                  if (midiNote > 0) {
+                      synthManager.voice()->setInternalParameterValue(
+                        "frequency", ::pow(2.f, (midiNote - 69.f) / 12.f) * 432.f);
+                      synthManager.triggerOn(midiNote);
+                   
+                      MIDINoteTriggeredLastTime.push_back(midiNote);
+                  }
                 } else {
-                  HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                  OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
                 }
               } else {
-                if (currentNonInputLayerValues[layer][row][col] > inputLayerFireThreshold) {
-                  HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
-                  currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+                if (layer > 0) {
+                  if (currentNonInputLayerValues[layer][row][col] > firingThreshold) {
+                    HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
+                    currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+                  } else {
+                    HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                  }
                 } else {
-                  HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                  if (currentNonInputLayerValues[layer][row][col] > inputLayerFireThreshold) {
+                    HiddenLayers.color(HSV(0.17f, 0.8f, 1.0f));
+                    currentFiredNonInputNeuronPos.push_back(state().hiddenLayerNeuronFixedPosition[layer][row][col]);
+                  } else {
+                    HiddenLayers.color(HSV(0.0f, 1.0f, 0.3f)); 
+                  }
                 }
-              }
-            }  
+              }  
+            }
+          }
+          currentFiredNeuronPos.push_back(currentFiredNonInputNeuronPos);
+        }
+
+        ConnectionLines.colors().clear();
+        ConnectionLines.vertices().clear();
+
+        for (int startLayer = 0; startLayer < currentFiredNeuronPos.size() - 1; startLayer++) {
+          vector<Vec3f> startLayerPositions = currentFiredNeuronPos[startLayer];
+          vector<Vec3f> endLayerPositions = currentFiredNeuronPos[startLayer + 1];
+
+          for (Vec3f oneStartPosition : startLayerPositions) {
+           for (Vec3f oneEndPosition : endLayerPositions) {
+              ConnectionLines.vertex(oneStartPosition);
+              ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
+              ConnectionLines.vertex(oneEndPosition);
+              ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
+            }
           }
         }
-        currentFiredNeuronPos.push_back(currentFiredNonInputNeuronPos);
+        ConnectionLines.primitive(Mesh::LINES);
+
+      } else {
+
       }
-
-      ConnectionLines.colors().clear();
-      ConnectionLines.vertices().clear();
-
-      for (int startLayer = 0; startLayer < currentFiredNeuronPos.size() - 1; startLayer++) {
-        
-        vector<Vec3f> startLayerPositions = currentFiredNeuronPos[startLayer];
-        vector<Vec3f> endLayerPositions = currentFiredNeuronPos[startLayer + 1];
-
-        for (Vec3f oneStartPosition : startLayerPositions) {
-          for (Vec3f oneEndPosition : endLayerPositions) {
-            ConnectionLines.vertex(oneStartPosition);
-            ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
-            ConnectionLines.vertex(oneEndPosition);
-            ConnectionLines.color(HSV(0.17f, 1.0f, 1.0f));
-          }
-        }
-      }
-      ConnectionLines.primitive(Mesh::LINES);
+      
 
     } else {
       frameCount += 1;
