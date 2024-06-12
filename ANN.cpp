@@ -47,24 +47,38 @@ bool inStdRange(float n) {
 }
 
 
+
+double sigmoid(double z) {
+    return 1.0 / (1.0 + exp(-z));
+}
+
+
 // * Major function that determines how the hidden & output layer neurons calculate
 //   - x: the relative x position in the matrix, from 0 to 1
 //   - y: the relative y position in the matrix, from 0 to 1
 float ANNAlgorithm(float x, float y, vector<vector<float>> input) {
-    float result = 0.0;
-    float count = 0.0;
-    for (vector<float> oneRow : input) {
-        for (float oneValue : oneRow) {
-            result += oneValue;
-            count += 1.0;
+    float totalSum = 0.0;
+    float weight, distanceSquared;
+    float N = input.size();
+
+    // Iterate over all inputs and calculate the weighted sum
+    for (int k = 0; k < N; ++k) {
+        for (int l = 0; l < N; ++l) {
+            distanceSquared = (x - k) * (x - k) + (y - l) * (y - l);
+            weight = exp(-distanceSquared / 2.0);
+            totalSum += weight * input[k][l];
         }
     }
+    float rawAnswer = sigmoid(totalSum) + rnd::uniform(0.2) - 0.12;
+    if (rawAnswer > 1.0) {
+        rawAnswer = 1.0;
+    }
+    if (rawAnswer < 0.0) {
+        rawAnswer = 0.0;
+    }
+    return pow(rawAnswer, 2);
+    
 
-    float bias = rnd::uniform(1.0);
-    result = result * result;
-    //result += bias;
-    //return ((result + (x / 2.0)) / (count + (y / 2.0)));
-    return bias;
 }
 
 
