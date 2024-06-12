@@ -2,13 +2,51 @@
 // Yuehao Gao
 // Designed based on Myungin Lee(2022) Sine Envelope with Visuals
 
-// Allosphere Artificial Neural Network Illustration with Sonification
-// Inspired by a YouTube Video: 
+// This is an Allosphere version of Artificial Neural Network (ANN)
+// Being illustrated and sonified
+// The initiative was inspired by the following YouTube Video: 
 // https://www.youtube.com/watch?v=Tsvxx-GGlTg&t=1s
 
+// The class consists of a ANN sturcutre: nonInputLayers "hiddenAndOutputNeurons"
+// Which consists of all neurons in the hidden and the output layers
+// Processing the input matrix feed to the individual input layer
+
+// For the input layer:
+// The values are initialized to 0.0
+// Each time it is refreshed, it follows a "moving oval" crawling on the canvas
+// https://editor.p5js.org/Yuehao_Gao/full/geABl5pWf
+
+// For the hidden and output layers:
+// Each neuron processes the values in the previous layer
+// According to the "ANNAlgorithm" method in the ANN.cpp file
+// The output layer is supposed to "blurrily outline" the input layer in a "Mosaic" manner
+// The output layer is also sonified by:
+//    - The very center is sonified to the tone of C3
+//    - Follows a full-note-scale system
+//    - The further the fired neuron is in the output layer, the higher its pitch
+
 // ----------------------------------------------------------------
+
+// * Important parameters *:
+//    - REFRESH_THRESHOLD:         how many times "onAminate" called trigger the next refresh
+//                                 "onAnimate" is called 60 times / second
+//                                 hence a value of 60 means 1 refresh / second
+//                                 and a value of 1 means 60 refresh / second
+//    - ANN_SIZE:                  the width of each layer
+//    - ANN_NUM_HIDDEN_LAYERS:     the number of hidden layers of the ANN
+//                                 not including the output layer
+//    - inputLayerFireThreshold:   how large should a number in the input layer be to
+//                                 "light up" the particle
+//    - firingThreshold:           how large should a number in the hidden layer be to
+//                                 "light up" the particle
+//    - outputLayerFireThreshold:  how large should a number in the output layer be to
+//                                 "light up" the particle
+
+// ----------------------------------------------------------------
+
 // Press '=' to enable/disable navigation
 // Press '[' or ']' to turn on & off GUI 
+
 // ----------------------------------------------------------------
 
 
@@ -26,7 +64,6 @@
 #include "Gamma/Envelope.h"
 #include "Gamma/Oscillator.h"
 #include "Gamma/DFT.h"
-
 //#include "al/app/al_App.hpp"
 #include "al/app/al_DistributedApp.hpp"
 #include "al/app/al_GUIDomain.hpp"
@@ -35,7 +72,6 @@
 #include "al/graphics/al_Shapes.hpp"
 #include "al/io/al_MIDI.hpp"
 #include "al/math/al_Functions.hpp"
-//#include "al/math/al_Random.hpp"
 #include "al/scene/al_PolySynth.hpp"
 #include "al/scene/al_SynthSequencer.hpp"
 #include "al/ui/al_ControlGUI.hpp"
@@ -46,13 +82,25 @@
 // using namespace gam;
 using namespace al;
 using namespace std;
-#define FFT_SIZE 4048
+
+
+// * ----------------------------------- *
+// * ---- * IMPORTANT PARAMETERS * ----- *
+
+#define REFRESH_THRESHOLD 30          // The refresh rate of oval
 #define ANN_SIZE 25
 #define ANN_NUM_HIDDEN_LAYERS 2
+const float inputLayerFireThreshold = 0.33;
+const float firingThreshold = 0.66;
+const float outputLayerFireThreshold = 0.9;
 
+// * ----------------------------------- *
+// * ----------------------------------- *
+
+
+#define FFT_SIZE 4048
 #define CHANGE_MOTION_LOWER_LIMIT 180
 #define CHANGE_MOTION_UPPER_LIMIT 360
-
 #define WHITE_H 0.0
 #define WHITE_S 0.0
 #define WHITE_V 100.0
@@ -66,10 +114,7 @@ const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
 
-#define REFRESH_THRESHOLD 30          // The refresh rate of oval
-const float firingThreshold = 0.66;
-const float inputLayerFireThreshold = 0.33;
-const float outputLayerFireThreshold = 0.9;
+
 
 
 
