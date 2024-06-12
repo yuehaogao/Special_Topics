@@ -26,6 +26,8 @@
 #include <stdlib.h>
 #include <fstream>
 #include <time.h> 
+#include <chrono>
+#include <thread>
 
 #include "Gamma/Analysis.h"
 #include "Gamma/Effects.h"
@@ -54,7 +56,7 @@ using namespace al;
 using namespace std;
 #define FFT_SIZE 4048
 #define ANN_SIZE 25
-#define ANN_NUM_HIDDEN_LAYERS 5
+#define ANN_NUM_HIDDEN_LAYERS 2
 
 #define CHANGE_MOTION_LOWER_LIMIT 180
 #define CHANGE_MOTION_UPPER_LIMIT 360
@@ -72,9 +74,9 @@ const float pointDistance = 0.3;
 const float layerDistance = 7.0 * pointDistance;
 const float lineWidth = 0.5;
 
-#define REFRESH_THRESHOLD 6          // The refresh rate of oval
+#define REFRESH_THRESHOLD 15          // The refresh rate of oval
 const float firingThreshold = 0.97;
-const float outputLayerFireThreshold = 0.9;
+const float outputLayerFireThreshold = 0.99;
 
 
 
@@ -537,6 +539,18 @@ public:
               if (currentNonInputLayerValues[ANN_NUM_HIDDEN_LAYERS][row][col] > outputLayerFireThreshold) {
                 OutputLayer.color(HSV(0.17f, 1.0f, 1.0f));
                 currentFiredNonInputNeuronPos.push_back(state().outputLayerNeuronFixedPosition[row][col]);
+
+                int midiNote = 36 + 2 * col;
+                if (midiNote > 0)
+                 {
+                   synthManager.voice()->setInternalParameterValue(
+                        "frequency", ::pow(2.f, (midiNote - 69.f) / 12.f) * 432.f);
+                   synthManager.triggerOn(midiNote);
+                   this_thread::sleep_for(chrono::milliseconds(15 * REFRESH_THRESHOLD));
+                   synthManager.triggerOff(midiNote);
+                 }
+                
+
               } else {
                 OutputLayer.color(HSV(0.0f, 0.0f, 0.7f));
               }
