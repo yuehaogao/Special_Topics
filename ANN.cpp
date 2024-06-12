@@ -1,3 +1,31 @@
+// Yuehao Gao | MAT594P
+// 2024-5-1   | ANN Structure
+
+// This file represents the data structure of an ANN neural network
+// Consisted of:
+//    -- An input layer with size N * N
+//    -- A fixed number of hidden layers, each with size N * N
+//    -- A output layer with size N * N
+
+// To construct a new ANN, the syntax is:
+//    -- NonInputLayers(int numLayers, int size);
+//    -- Where:
+//         -- numLayers: the total number of hidden layers plus one output layer
+//         -- size: the size of the square array of each neuron layer
+
+// The input layer is supposed to feed with bool value 0.0 or 1.0
+// But other numbers between 0.0 and 1.0 are also accepted
+// Each neuron in the hidden and output layer receives all values from the previosu layer
+// And output a single number according to the "ANNAlrogithm" method
+// Which is following a non-linear activation function, determined by:
+//    -- Distance-Based Weighting: w(k, l) = e^(-((i-k)^2 + (j-l)^2) / 2 * σ^2)
+//    -- Weighted Sum Calculation
+//    -- Adding a negative-number-weighted bias
+//    -- Limiting and squaring the output
+
+// ---------------------------------------------------------------------------------
+
+
 #include <iostream>
 #include <vector>
 #include <cstdlib>
